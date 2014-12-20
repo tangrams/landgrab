@@ -1,7 +1,7 @@
 landgrab
 ========
 
-A python script to download vector tiles which contain a feature on openstreetmap.
+A python script to download vector tiles which contain a feature on openstreetmap and save them in a directory, which you can then view on http://geojson.io/
 
 ![Manhattan](https://raw.githubusercontent.com/meetar/landgrab/master/manhattan.jpg)
 
@@ -11,8 +11,13 @@ A python script to download vector tiles which contain a feature on openstreetma
 
 ## Usage
 
-Currently only tested with the outline of Manhattan: www.openstreetmap.org/relation/3954665
+python landgrab.py [osm id] [zoom level]
 
-    python landgrab.py 3954665
+- Manhattan Island: `python landgrab.py 3954665 15`
+- Rhode Island: `python landgrab.py 392915 12`
+- Indiana: `python landgrab.py 161816 9`
+- Alaska: `python landgrab.py 1116270 6` (broken)
 
-Will save the relevant tiles in a tiles directory, which you can then view on http://geojson.io/
+## Todo:
+
+- handle shapes which cross the international dateline
