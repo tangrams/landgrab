@@ -1,7 +1,7 @@
 landgrab
 ========
 
-A python script to download vector tiles which contain a feature on openstreetmap and save them in a directory, which you can then view on http://geojson.io/
+A python script to download vector tiles which contain a feature on OpenStreetMap.
 
 ![Manhattan](https://raw.githubusercontent.com/meetar/landgrab/master/manhattan.jpg)
 
@@ -17,6 +17,8 @@ python landgrab.py [osm id] [zoom level]
 - Rhode Island: `python landgrab.py 392915 12`
 - Indiana: `python landgrab.py 161816 9`
 - Alaska: `python landgrab.py 1116270 6` (broken)
+
+Test your downloads by viewing them on http://geojson.io/
 
 ## Todo:
 
