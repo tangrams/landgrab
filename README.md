@@ -9,7 +9,7 @@ A python script to download vector tiles which contain a feature on openstreetma
 
 ## Usage
 
-Currently only tested with the outline of Manhattan:
+Currently only tested with the outline of Manhattan: www.openstreetmap.org/relation/3954665
 
     python landgrab.py 3954665
 
