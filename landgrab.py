@@ -1,18 +1,21 @@
+# todo: handle cases where the boundary crosses the dateline
+
 import requests, json, math, sys, os
 import xml.etree.ElementTree as ET
 
 OSMID=sys.argv[1]
-# OUTFILE=sys.argv[2]
+zoom=int(sys.argv[2])
 
-r = requests.get('http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full')
-print r.encoding
+INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full'
+print "Downloading", INFILE
+r = requests.get(INFILE)
+
+# print r.encoding
 open('outfile.xml', 'w').close() # clear existing OUTFILE
 
 with open('outfile.xml', 'w') as fd:
   fd.write(r.text.encode("UTF-8"))
   fd.close()
-
-zoom = 15
 
 tree = ET.parse('outfile.xml')
 
@@ -66,33 +69,92 @@ def metersForTile(tile):
 ## PROCESSING
 ##
 
-minx = 180.
-maxx = -180.
-miny = 90.
-maxy = -90.
+## find boundingbox of latlongs
+# minx = 180.
+# maxx = -180.
+# miny = 90.
+# maxy = -90.
+print "Processing:"
 
-# extract latlongs
 for node in root:
     if node.tag == "node":
         lat = float(node.attrib["lat"])
         lon = float(node.attrib["lon"])
         points.append({'y':lat, 'x':lon})
-        minx = min(minx, lon)
-        maxx = max(maxx, lon)
-        miny = min(miny, lat)
-        maxy = max(maxy, lat)
-print miny, minx, maxy, maxx
+#         minx = min(minx, lon)
+#         maxx = max(maxx, lon)
+#         miny = min(miny, lat)
+#         maxy = max(maxy, lat)
+# print miny, minx, maxy, maxx
 
-# find tile
+## find tile
 for point in points:
     tiles.append(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom))
 
-# de-dupe
-print len(tiles)
+## de-dupe
+# print len(tiles)
 tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
-print len(tiles)
-print tiles
+# print len(tiles)
 
+## patch holes in tileset
+
+## get min and max tiles for lat and long
+
+minx = 1048577
+maxx = -1
+miny = 1048577
+maxy = -1
+
+for tile in tiles:
+    minx = min(minx, tile['x'])
+    maxx = max(maxx, tile['x'])
+    miny = min(miny, tile['y'])
+    maxy = max(maxy, tile['y'])
+# print miny, minx, maxy, maxx
+
+newtiles = []
+
+for tile in tiles:
+    # find furthest tiles from this tile on x and y axes
+    x = tile['x']
+    lessx = 1048577
+    morex = -1
+    y = tile['y']
+    lessy = 1048577
+    morey = -1
+    for t in tiles:
+        if int(t['x']) == int(tile['x']):
+            # check on y axis
+            lessy = min(lessy, t['y'])
+            morey = max(morey, t['y'])
+        if int(t['y']) == int(tile['y']):
+            # check on x axis
+            lessx = min(lessx, t['x'])
+            morex = max(morex, t['x'])
+
+    # if a tile is found which is not directly adjacent, add all the tiles between the two
+    if (lessy + 2) < tile['y']:
+        for i in range(int(lessy+1), int(tile['y'])):
+            newtiles.append({'x':tile['x'],'y':i, 'z':zoom})
+    if (morey - 2) > tile['y']:
+        for i in range(int(morey-1), int(tile['y'])):
+            newtiles.append({'x':tile['x'],'y':i, 'z':zoom})
+    if (lessx + 2) < tile['x']:
+        for i in range(int(lessx+1), int(tile['x'])):
+            newtiles.append({'x':i,'y':tile['y'], 'z':zoom})
+    if (morex - 2) > tile['x']:
+        for i in range(int(morex-1), int(tile['x'])):
+            newtiles.append({'x':i,'y':tile['y'], 'z':zoom})
+
+## de-dupe
+newtiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in newtiles)]
+## add fill tiles to boundary tiles
+tiles = tiles + newtiles
+## de-dupe
+tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
+print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
+
+## make/empty the tiles folder
 folder = "tiles"
 if not os.path.exists(folder):
     os.makedirs(folder)
@@ -105,15 +167,29 @@ for the_file in os.listdir(folder):
     except Exception, e:
         print e
 
+## download tiles
+total = len(tiles)
+if total == 0:
+    print("Error: no tiles")
+    exit()
+count = 0
+sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
+sys.stdout.flush()
 for tile in tiles:
     tilename = "%i-%i-%i.json" % (zoom,tile['x'],tile['y'])
     r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (zoom, tile['x'],tile['y']))
 
     j = json.loads(r.text)
+    # extract only earth layer - mapzen vector tile files are collections of jeojson objects -
+    # doing this turns each file into a valid standalone geojson files -
+    # you can replace "earth" with whichever layer you want, or comment it out for the
+    # original collection format with all the data
     j = json.dumps(j["earth"]) 
 
     with open('tiles/'+tilename, 'w') as fd:
-        # fd.write(r.text.encode("UTF-8"))
         fd.write(j.encode("UTF-8"))
         fd.close()
+    count += 1
+    sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
+    sys.stdout.flush()
     
