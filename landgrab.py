@@ -2,9 +2,14 @@
 
 import requests, json, math, sys, os
 import xml.etree.ElementTree as ET
+import pprint
 
 OSMID=sys.argv[1]
 zoom=int(sys.argv[2])
+coordsonly=0
+if len(sys.argv) > 3:
+    coordsonly=int(sys.argv[3])
+    print coordsonly
 
 INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full'
 print "Downloading", INFILE
@@ -152,44 +157,51 @@ newtiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in
 tiles = tiles + newtiles
 ## de-dupe
 tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
-print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
 
-## make/empty the tiles folder
-folder = "tiles"
-if not os.path.exists(folder):
-    os.makedirs(folder)
 
-for the_file in os.listdir(folder):
-    file_path = os.path.join(folder, the_file)
-    try:
-        if os.path.isfile(file_path):
-            os.unlink(file_path)
-    except Exception, e:
-        print e
+if coordsonly == 1:
+    ## output coords
+    pprint.pprint(tiles)
+else:
+    ## download tiles
+    print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
 
-## download tiles
-total = len(tiles)
-if total == 0:
-    print("Error: no tiles")
-    exit()
-count = 0
-sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
-sys.stdout.flush()
-for tile in tiles:
-    tilename = "%i-%i-%i.json" % (zoom,tile['x'],tile['y'])
-    r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (zoom, tile['x'],tile['y']))
+    ## make/empty the tiles folder
+    folder = "tiles"
+    if not os.path.exists(folder):
+        os.makedirs(folder)
 
-    j = json.loads(r.text)
-    # extract only earth layer - mapzen vector tile files are collections of jeojson objects -
-    # doing this turns each file into a valid standalone geojson files -
-    # you can replace "earth" with whichever layer you want, or comment it out for the
-    # original collection format with all the data
-    j = json.dumps(j["earth"]) 
+    for the_file in os.listdir(folder):
+        file_path = os.path.join(folder, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception, e:
+            print e
 
-    with open('tiles/'+tilename, 'w') as fd:
-        fd.write(j.encode("UTF-8"))
-        fd.close()
-    count += 1
+    total = len(tiles)
+    if total == 0:
+        print("Error: no tiles")
+        exit()
+    count = 0
     sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
     sys.stdout.flush()
-    
+    for tile in tiles:
+        tilename = "%i-%i-%i.json" % (zoom,tile['x'],tile['y'])
+        r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (zoom, tile['x'],tile['y']))
+        j = json.loads(r.text)
+        # extract only earth layer - mapzen vector tile files are collections of jeojson objects -
+        # doing this turns each file into a valid standalone geojson files -
+        # you can replace "earth" with whichever layer you want
+        j = json.dumps(j["buildings"]) 
+
+        # use this jumps() command instead for the original feature collection with all the data
+        # j = json.dumps(j);
+
+        with open('tiles/'+tilename, 'w') as fd:
+            fd.write(j.encode("UTF-8"))
+            fd.close()
+        count += 1
+        sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
+        sys.stdout.flush()
+        
