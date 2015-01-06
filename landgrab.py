@@ -22,7 +22,12 @@ with open('outfile.xml', 'w') as fd:
   fd.write(r.text.encode("UTF-8"))
   fd.close()
 
-tree = ET.parse('outfile.xml')
+try:
+    tree = ET.parse('outfile.xml')
+except Exception, e:
+    print e
+    print "XML parse failed, please check outfile.xml"
+    sys.exit()
 
 root = tree.getroot()
 
@@ -97,9 +102,7 @@ for point in points:
     tiles.append(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom))
 
 ## de-dupe
-# print len(tiles)
 tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
-# print len(tiles)
 
 ## patch holes in tileset
 
@@ -162,6 +165,7 @@ tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in ti
 if coordsonly == 1:
     ## output coords
     pprint.pprint(tiles)
+    print "Finished: %i tiles at zoom level %i" % (len(tiles), zoom)
 else:
     ## download tiles
     print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
