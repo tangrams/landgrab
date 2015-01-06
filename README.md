@@ -23,4 +23,4 @@ Test your downloads by viewing them on http://geojson.io/
 
 ## Todo:
 
-- handle shapes which cross the international dateline
+- handle shapes which cross the International Date Line
