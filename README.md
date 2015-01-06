@@ -11,9 +11,10 @@ A python script to download vector tiles which contain a feature on OpenStreetMa
 
 ## Usage
 
-python landgrab.py [osm id] [zoom level]
+python landgrab.py [osm id] [zoom level] [optional list-only flag]
 
 - Manhattan Island: `python landgrab.py 3954665 15`
+- Manhattan Island, list of tiles only: `python landgrab.py 3954665 15 1`
 - Rhode Island: `python landgrab.py 392915 12`
 - Indiana: `python landgrab.py 161816 9`
 - Alaska: `python landgrab.py 1116270 6` (broken)
