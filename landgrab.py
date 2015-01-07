@@ -11,9 +11,37 @@ if len(sys.argv) > 3:
     coordsonly=int(sys.argv[3])
     print coordsonly
 
-INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full'
-print "Downloading", INFILE
-r = requests.get(INFILE)
+success = False
+try:
+    INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full'
+    print "Downloading", INFILE
+    r = requests.get(INFILE)
+    r.raise_for_status()
+    success = True
+except Exception, e:
+    print e
+
+if not success:
+    try:
+        INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full'
+        print "Downloading", INFILE
+        r = requests.get(INFILE)
+        r.raise_for_status()
+        success = True
+    except Exception, e:
+        print e
+
+if not success:
+    try:
+        INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID+'/full'
+        print "Downloading", INFILE
+        r = requests.get(INFILE)
+        r.raise_for_status()
+        success = True
+    except Exception, e:
+        print e
+        print "Element not found, exiting"
+        sys.exit()
 
 # print r.encoding
 open('outfile.xml', 'w').close() # clear existing OUTFILE
@@ -194,9 +222,10 @@ else:
         tilename = "%i-%i-%i.json" % (zoom,tile['x'],tile['y'])
         r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (zoom, tile['x'],tile['y']))
         j = json.loads(r.text)
-        # extract only earth layer - mapzen vector tile files are collections of jeojson objects -
+
+        # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
         # doing this turns each file into a valid standalone geojson files -
-        # you can replace "earth" with whichever layer you want
+        # you can replace "buildings" with whichever layer you want
         j = json.dumps(j["buildings"]) 
 
         # use this jumps() command instead for the original feature collection with all the data
