@@ -33,7 +33,7 @@ if not success:
 
 if not success:
     try:
-        INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID+'/full'
+        INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID
         print "Downloading", INFILE
         r = requests.get(INFILE)
         r.raise_for_status()
@@ -226,10 +226,10 @@ else:
         # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
         # doing this turns each file into a valid standalone geojson files -
         # you can replace "buildings" with whichever layer you want
-        j = json.dumps(j["buildings"]) 
+        # j = json.dumps(j["buildings"]) 
 
         # use this jumps() command instead for the original feature collection with all the data
-        # j = json.dumps(j);
+        j = json.dumps(j);
 
         with open('tiles/'+tilename, 'w') as fd:
             fd.write(j.encode("UTF-8"))
