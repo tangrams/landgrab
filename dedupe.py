@@ -18,7 +18,7 @@ from Polygon.IO import *
 # parse the json into a python object
 
 tiles = []
-f = open('tiles/15-9648-12317.json', 'r')
+f = open('test.json', 'r')
 tiles.append(f.read())
 # print tiles
 
@@ -66,7 +66,26 @@ for f in j["buildings"]["features"]:
     # polys.append(Polygon(tuple(tuple(i) for i in c)))
 
 print len(polys)
-writeSVG('test.svg', polys, width=800, height=800)
+
+# for each polygon
+for i, p in enumerate(polys):
+    # check against every other polygon in the list, starting with the next one
+    for index in range(i+1, len(polys)):
+        # if they have the same # of verts
+        if len(p) == len(polys[index]):
+            match = True
+            # for each vertex
+            for j, v in enumerate(p):
+                if p[j] != polys[index][j]:
+                    match = False
+                    break
+            if match:
+                print "match:", p, polys[index]
+
+
+
+
+# writeSVG('test.svg', polys, width=800, height=800)
 
 
 sys.exit()
