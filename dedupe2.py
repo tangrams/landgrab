@@ -86,6 +86,8 @@ for t in tiles:
             # print len(c) # rectangles have 5 - first and last coords are identical
             # remove last redundant coordinate from each poly
             del c[-1]
+            # print len(c)
+            # print c
             for v in c:
                 # print "v:", v
                 # print tilemax[0]
@@ -96,6 +98,9 @@ for t in tiles:
             #     print(tuple(i))
             # print (tuple(i) for i in c)
             p.addContour([tuple(i) for i in c])
+            # print p
+            # print p[0]
+            # sys.exit()
 
             # print "poly:", poly
             # print ""
@@ -112,20 +117,45 @@ for t in tiles:
 print len(polys)
 
 matches = []
+mults = []
+
+def compare(first, second):
+    for i, v in enumerate(first):
+        # print "> checking:"
+        # print p[j]
+        # print polys[index][j]
+        if v != polys[i]:
+            return False
+    return True
+
+
 # brute force duplication check
 # for each polygon
 for i, p in enumerate(polys):
     # check against every other polygon in the list, starting with the next one
+    # print len(p)
+    if len(p) > 1:
+        # print len(p)
+        # for j in p:
+            # print len(j), j
+        mults.append(p)
+        # print len(mults)
     for index in range(i+1, len(polys)):
-        # if they have the same # of verts
+        # if they have the same # of contours
         if len(p) == len(polys[index]):
             match = True
             # for each vertex
             for j, v in enumerate(p):
+                print "> checking:"
+                print p[j]
+                print polys[index][j]
                 if p[j] != polys[index][j]:
                     match = False
                     break
+                else:
+                    print ">> match"
             if match:
+                sys.exit()
                 # print "match:", p, polys[index]
                 matches.append(p)
 
@@ -133,6 +163,7 @@ for i, p in enumerate(polys):
 # writeSVG('tiles.svg', polys, width=800, height=800)
 # writeSVG('overlap.svg', matches, width=800, height=800)
 writeSVG('tiles.svg', polys)
+writeSVG('mults.svg', mults)
 writeSVG('overlap.svg', matches)
 
 
