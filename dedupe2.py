@@ -58,11 +58,11 @@ print len(tiles)
 print [t.path for t in tiles]
 # print [t.data for t in tiles]
 
-sys.exit()
 
-for t in tiles:
-    j = json.loads(tiles[0])
 polys = []
+dupes = []
+for t in tiles:
+    j = json.loads(t.data)
         # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
         # doing this turns each file into a valid standalone geojson files -
         # you can replace "buildings" with whichever layer you want
@@ -80,32 +80,38 @@ polys = []
 #         # print tuple(tuple(i) for i in c)
 #         polys.append(Polygon(tuple(tuple(i) for i in c)))
 
-for f in j["buildings"]["features"]:
-    p = Polygon()
-    for c in f["geometry"]["coordinates"]:
-        # print len(c) # rectangles have 5 - first and last coords are identical
-        # remove last redundant coordinate from each poly
-        del c[-1]
-        # print "c:", c
-        # for i in c:
-        #     print(tuple(i))
-        # print (tuple(i) for i in c)
-        p.addContour([tuple(i) for i in c])
+    for f in j["buildings"]["features"]:
+        p = Polygon()
+        for c in f["geometry"]["coordinates"]:
+            # print len(c) # rectangles have 5 - first and last coords are identical
+            # remove last redundant coordinate from each poly
+            del c[-1]
+            for v in c:
+                # print "v:", v
+                # print tilemax[0]
+                # offset tiles to arrange in scenespace
+                v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
+                # print "v2:", v
+            # for i in c:
+            #     print(tuple(i))
+            # print (tuple(i) for i in c)
+            p.addContour([tuple(i) for i in c])
 
-    # print "poly:", poly
-    # print ""
-    # pp = tuple(tuple(j) for j in poly)
-    # print "pp:", pp
-    #     # polys.append(pp)
-    # ppp = Polygon(pp)
-    # print Polygon(tuple(tuple(j) for j in poly))
-    # polys.append(Polygon(tuple(tuple(j) for j in poly)))
-    # polys.append(Polygon(tuple(tuple(j) for j in poly)))
-    polys.append(p)
-    # polys.append(Polygon(tuple(tuple(i) for i in c)))
+            # print "poly:", poly
+            # print ""
+            # pp = tuple(tuple(j) for j in poly)
+            # print "pp:", pp
+            #     # polys.append(pp)
+            # ppp = Polygon(pp)
+            # print Polygon(tuple(tuple(j) for j in poly))
+            # polys.append(Polygon(tuple(tuple(j) for j in poly)))
+            # polys.append(Polygon(tuple(tuple(j) for j in poly)))
+            polys.append(p)
+            # polys.append(Polygon(tuple(tuple(i) for i in c)))
 
 print len(polys)
 
+matches = []
 # brute force duplication check
 # for each polygon
 for i, p in enumerate(polys):
@@ -120,12 +126,14 @@ for i, p in enumerate(polys):
                     match = False
                     break
             if match:
-                print "match:", p, polys[index]
+                # print "match:", p, polys[index]
+                matches.append(p)
 
 
-
-
-# writeSVG('test.svg', polys, width=800, height=800)
+# writeSVG('tiles.svg', polys, width=800, height=800)
+# writeSVG('overlap.svg', matches, width=800, height=800)
+writeSVG('tiles.svg', polys)
+writeSVG('overlap.svg', matches)
 
 
 sys.exit()
