@@ -136,24 +136,45 @@ groups = []
 multiples = []
 sorted = []
 for i, p in enumerate(polys):
-    if i % 1000 == 0: print i
+    if i % 1000 == 0:
+        print i
+        # print p
     # skip polys which have already been grouped by a previous match
     if i not in sorted:
+        # print "\nnewgroup"
         group = [p]
         # check each polygon against all the others
-        for j in range(len(polys)):
+        for j in range(i+1, len(polys)):
             if p.overlaps(polys[j]):
-                group.append(polys[j])
+                # check to make sure it's not just adjacent
+                if p.covers(polys[j]):
+                    group.append(polys[j])
+                elif polys[j].covers(p):
+                    group.insert(0, polys[j])
+                
+                    # print "overlap:"
+                    # for x in group:
+                        # print x[0]
+        groups.append(group)
         # if the group has more than one element
-        if len(group[len(group)-1]):
+        if len(group) > 1:
             # add to multiples, for separate debug rendering
-            multiples.append(group[len(group)-1])
+            multiples.append(group)
+
+# clear out items from groups which are only adjacent
 
 print "all groups:", len(groups)
+# print groups[0]
+mults = [item for sublist in multiples for item in sublist] 
+# for g in groups:
+#     if len(g) > 1:
+#         print g
+#         sys.exit()
 print "multiples:", len(multiples)
-
-writeSVG('groups.svg', groups)
-writeSVG('multiples.svg', multiples)
+print "mults:", len(mults)
+# print multiples
+# writeSVG('groups.svg', groups2)
+writeSVG('multiples.svg', mults)
 
 
 
@@ -323,7 +344,7 @@ else:
     print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
 
     ## make/empty the tiles folder
-    folder = "tiles"
+    folder = "tiles1"
     if not os.path.exists(folder):
         os.makedirs(folder)
 
