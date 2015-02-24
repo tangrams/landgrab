@@ -138,26 +138,26 @@ contains = [] # all shapes which completely contain other shapes
 overlaps = [] # all shapes which touch other shapes
 area = []
 areas = set()
-sortedpolys = []
-for i, p in enumerate(polys):
-    if i % 1000 == 0:
-        print i
+sorted = []
+# for i, p in enumerate(polys):
+#     if i % 1000 == 0:
+#         print i
         # print p
     # skip polys which have already been grouped by a previous match
-    if i not in sortedpolys:
-        # print "\nnewgroup"
-        group = [p]
-        # check each polygon against all the others
-        for j in range(i+1, len(polys)):
-            q = polys[j]
-            # check for any touching
-            if p.overlaps(q):
-                overlaps.append(q)
-                # check for total 
-                if p.covers(q):
-                    group.append(q)
-                elif q.covers(p):
-                    group.insert(0, q)
+    # if i not in sorted:
+    #     # print "\nnewgroup"
+    #     group = [p]
+    #     # check each polygon against all the others
+    #     for j in range(i+1, len(polys)):
+    #         q = polys[j]
+    #         # check for any touching
+    #         if p.overlaps(q):
+    #             overlaps.append(q)
+    #             # check for total 
+    #             if p.covers(q):
+    #                 group.append(q)
+    #             elif q.covers(p):
+    #                 group.insert(0, q)
 
                 # check for overlap greater than some area:
                 # if (p & q).area() > 3.67591371814e-08:
@@ -173,15 +173,17 @@ for i, p in enumerate(polys):
                     #     areas.insert(0, p)
 
     
-        groups.append(group)
-        # if the group has more than one element
-        if len(group) > 1:
-            # add to contains, for separate debug rendering
-            areas.add(tuple(group))
-            contains.append(group)
+        # groups.append(group)
+        # # if the group has more than one element
+        # if len(group) > 1:
+        #     # add to contains, for separate debug rendering
+        #     areas.add(tuple(group))
+        #     contains.append(group)
 
 # sort areas groups by apparent area
 # print areas[0]
+test1 = [1, 2, 3, 4]
+print sorted(test1)
 
 areas = list(areas)
 sortedareas = []
@@ -193,7 +195,7 @@ for group in areas:
         print p
         print p.area()
         print type(p)
-    # print sorted(group, key=lambda p: p.area() )
+    print sorted(group, key=lambda p: p.area() )
     newgroup = sorted(group, key=lambda p: p.area() )
     sortedareas.append( newgroup )
 
