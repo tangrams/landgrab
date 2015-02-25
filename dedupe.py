@@ -15,7 +15,7 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles1"
+path = "tiles"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
@@ -183,26 +183,28 @@ for i, p in enumerate(polys):
 # sort areas groups by apparent area
 # print areas[0]
 
-areas = list(areas)
+# areas = list(areas)
 sortedareas = []
 for group in areas:
     group = list(group)
-    print type(list(group))
-    print "-"
-    for p in group:
-        print p
-        print p.area()
-        print type(p)
+    # print type(list(group))
+    # print "-"
+    # for p in group:
+        # print p
+        # print p.area()
+        # print type(p)
     # print sorted(group, key=lambda p: p.area() )
-    newgroup = sorted(group, key=lambda p: p.area() )
+    newgroup = sorted(group, key=lambda p: -p.area() )
     sortedareas.append( newgroup )
 
 
-print "mean:", mean(area)
-print "median:", median(area)
-print "std:", std(area)
+# print "mean:", mean(area)
+# print "median:", median(area)
+# print "std:", std(area)
 print "all groups:", len(groups)
 # print groups[0]
+sortedareas2 = [item for sublist in sortedareas for item in sublist] 
+areas2 = [item for sublist in areas for item in sublist] 
 groups2 = [item for sublist in groups for item in sublist] 
 mults = [item for sublist in contains for item in sublist] 
 # for g in groups:
@@ -216,8 +218,8 @@ print "mults:", len(mults)
 writeSVG('groups.svg', groups2, stroke_width=(.1,.1))
 writeSVG('contains.svg', mults, stroke_width=(.1,.1))
 writeSVG('overlaps.svg', overlaps, stroke_width=(.1,.1))
-writeSVG('areas.svg', areas, stroke_width=(.1,.1))
-writeSVG('sortedareas.svg', sortedareas, stroke_width=(.1,.1))
+writeSVG('areas.svg', areas2, stroke_width=(.1,.1))
+writeSVG('sortedareas.svg', sortedareas2, height=2000, stroke_width=(.1,.1))
 
 
 
