@@ -1,8 +1,11 @@
 # todo: handle cases where the boundary crosses the dateline
 
 # from __future__ import print_function
+from __future__ import division
 import requests, json, time, math, re, sys, os
+from sys import stdout
 from numpy import *
+import numpy as np
 import xml.etree.ElementTree as ET
 import pprint
 from Polygon import *
@@ -93,15 +96,7 @@ polyslist = list(polysset)
 
 ## convert json polys to Polygon objects
 
-# first, the polys from the set (no duplicates)
-for p in polyslist:
-    poly = Polygon()
-    for c in p:
-        poly.addContour(c)
-    polys.append(poly)
-# print "lenth polys", len(polys)
-
-# then, the polys from the list (everything in the json)
+# first, the polys from the list (everything in the json)
 for p in allpolyslist:
     poly = Polygon()
     for c in p:
@@ -109,7 +104,16 @@ for p in allpolyslist:
     allpolys.append(poly)
 # print "length allpolys:", len(allpolys)
 
-# then the differencebetween them
+# then, the polys from the set (no duplicates)
+for p in polyslist:
+    poly = Polygon()
+    for c in p:
+        poly.addContour(c)
+    polys.append(poly)
+# print "lenth polys", len(polys)
+
+
+# then the difference between them
 # diffpolys = []
 # for p in difference:
 #     poly = Polygon()
@@ -117,31 +121,32 @@ for p in allpolyslist:
 #         poly.addContour(c)
 #     diffpolys.append(poly)
 
-## test print
-writeSVG('polys.svg', polys)
-writeSVG('allpolys.svg', allpolys)
+## test
+# writeSVG('polys.svg', polys)
+# writeSVG('allpolys.svg', allpolys)
 # writeSVG('difference.svg', diffpolys)
 
 
 
+# find and delete duplicate polys - done through use of a set
+# find overlapping polys - collision detect
+# group colliding polygons
+# determine which is the "master" poly for each group
+# assign each group to a tile by centroid of master poly
+# write the trimmed tiles back out
 
-## TODO:
-    # find overlap polys - collision detect
-    # determine poly hierarchy - determine which is the "master" poly for each group
-    # assign each group to a tile by centroid of master poly
-    # find and delete duplicate groups
-    # write the trimmed tiles back out
-
-print "checking", len(polys), "polys for overlap"
+print "checking polys for overlap"
 groups = [] # all buildings
 contains = [] # all shapes which completely contain other shapes
 overlaps = [] # all shapes which touch other shapes
 area = []
 areas = set()
 sortedpolys = []
+count = 0
+total = np.float64(np.sum(range(len(polys)))*2)
 for i, p in enumerate(polys):
-    if i % 1000 == 0:
-        print i
+    # if i % 1000 == 0:
+    #     print i
         # print p
     # skip polys which have already been grouped by a previous match
     if i not in sortedpolys:
@@ -149,6 +154,10 @@ for i, p in enumerate(polys):
         group = [p]
         # check each polygon against all the others
         for j in range(i+1, len(polys)):
+            count = j+(i*len(polys))
+            if count % (int(float(total)/100)) == 0:
+                stdout.write("\r%d%%" % abs(round((count/total * 100), 0)))
+                stdout.flush()                
             q = polys[j]
             # check for any touching
             if p.overlaps(q):
@@ -179,7 +188,8 @@ for i, p in enumerate(polys):
             # add to contains, for separate debug rendering
             areas.add(tuple(group))
             contains.append(group)
-
+stdout.write("\r100%\n")
+stdout.flush() 
 # sort areas groups by apparent area
 # print areas[0]
 
