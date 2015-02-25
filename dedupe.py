@@ -18,7 +18,7 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles"
+path = "tiles1"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
@@ -38,6 +38,7 @@ class Tile:
         self.x = x
         self.y = y
         self.data = data
+        # self.polys = polygons
 
 for t in files:
     f = open(t, 'r')
@@ -60,6 +61,10 @@ dupes = []
 count = 0
 for t in tiles:
     j = json.loads(t.data)
+    # print "t.data", t.data, "\n\n\n\n\n\n\n\n\n\n\n"
+    # t.json = j
+    # t.polys = j
+    # sys.exit()
 
     # for each building
     buildings = j["buildings"]["features"]
@@ -84,14 +89,7 @@ for t in tiles:
 
 polyslist = list(polysset)
 
-# copy the whole list and subtract the shortened list from it
-# difference = list(allpolyslist)
-# print "checking", len(difference), "polygons"
-# for i, x in enumerate(polyslist):
-#     if i % 1000 == 0: print i
-#     if x in difference:
-#         difference.remove(x)
-# print "duplicate polys removed:", len(allpolyslist)-len(difference)
+
 
 
 ## convert json polys to Polygon objects
@@ -99,8 +97,10 @@ polyslist = list(polysset)
 # first, the polys from the list (everything in the json)
 for p in allpolyslist:
     poly = Polygon()
+    poly.sources = []
     for c in p:
         poly.addContour(c)
+        poly.sources.append(c)
     allpolys.append(poly)
 # print "length allpolys:", len(allpolys)
 
@@ -110,7 +110,7 @@ for p in polyslist:
     for c in p:
         poly.addContour(c)
     polys.append(poly)
-# print "lenth polys", len(polys)
+print "length polys", len(polys)
 
 
 # then the difference between them
@@ -144,15 +144,31 @@ areas = set()
 sortedpolys = []
 count = 0
 total = np.float64(np.sum(range(len(polys)))*2)
+
+def checkGroups(poly):
+    # print len(groups)
+    for g in groups:
+        for q in g:
+            if poly.overlaps(q):
+                g.append(poly)
+                return True
+    return False
+
 for i, p in enumerate(polys):
+    # print i
     # if i % 1000 == 0:
     #     print i
         # print p
     # skip polys which have already been grouped by a previous match
     if i not in sortedpolys:
-        # print "\nnewgroup"
+        sortedpolys.append(i)
+        # check polygon against all grouped polygons
+        if checkGroups(p):
+            continue
+
+        # if not, start a new group
         group = [p]
-        # check each polygon against all the others
+        # check polygon against all ungrouped polygons
         for j in range(i+1, len(polys)):
             count = j+(i*len(polys))
             if count % (int(float(total)/100)) == 0:
@@ -161,15 +177,18 @@ for i, p in enumerate(polys):
             q = polys[j]
             # check for any touching
             if p.overlaps(q):
-                overlaps.append(q)
+                # group.append(q)
+                # sortedpolys.append(j)
+                # overlaps.append(q)
                 # check for total 
-                if p.covers(q):
-                    group.append(q)
-                elif q.covers(p):
-                    group.insert(0, q)
+                # if p.covers(q):
+                #     group.append(q)
+                # elif q.covers(p):
+                #     group.insert(0, q)
 
                 # check for overlap greater than some area:
-                # if (p & q).area() > 3.67591371814e-08:
+                if (p & q).area() > 3.67591371814e-08:
+                    group.append(q)
                     # note the area of the overlap
                     # area.append((p & q).area())
                     # order based on apparent hierarchy
@@ -184,18 +203,19 @@ for i, p in enumerate(polys):
     
         groups.append(group)
         # if the group has more than one element
-        if len(group) > 1:
-            # add to contains, for separate debug rendering
-            areas.add(tuple(group))
-            contains.append(group)
+        # if len(group) > 1:
+        #     # add to contains, for separate debug rendering
+        #     areas.add(tuple(group))
+        #     contains.append(group)
 stdout.write("\r100%\n")
 stdout.flush() 
 # sort areas groups by apparent area
 # print areas[0]
+print "all groups:", len(groups)
 
 # areas = list(areas)
-sortedareas = []
-for group in areas:
+sortedgroups = []
+for group in groups:
     group = list(group)
     # print type(list(group))
     # print "-"
@@ -205,7 +225,7 @@ for group in areas:
         # print type(p)
     # print sorted(group, key=lambda p: p.area() )
     newgroup = sorted(group, key=lambda p: -p.area() )
-    sortedareas.append( newgroup )
+    sortedgroups.append( newgroup )
 
 
 # print "mean:", mean(area)
@@ -213,8 +233,7 @@ for group in areas:
 # print "std:", std(area)
 print "all groups:", len(groups)
 # print groups[0]
-sortedareas2 = [item for sublist in sortedareas for item in sublist] 
-areas2 = [item for sublist in areas for item in sublist] 
+sortedgroups2 = [item for sublist in sortedgroups for item in sublist] 
 groups2 = [item for sublist in groups for item in sublist] 
 mults = [item for sublist in contains for item in sublist] 
 # for g in groups:
@@ -225,11 +244,10 @@ print "contains:", len(contains)
 print "mults:", len(mults)
 # print contains
 # print mults
-writeSVG('groups.svg', groups2, stroke_width=(.1,.1))
-writeSVG('contains.svg', mults, stroke_width=(.1,.1))
-writeSVG('overlaps.svg', overlaps, stroke_width=(.1,.1))
-writeSVG('areas.svg', areas2, stroke_width=(.1,.1))
-writeSVG('sortedareas.svg', sortedareas2, height=2000, stroke_width=(.1,.1))
+writeSVG('groups.svg', groups2, height=800, stroke_width=(.1,.1))
+# writeSVG('contains.svg', mults, height=800, stroke_width=(.1,.1))
+# writeSVG('overlaps.svg', overlaps, height=800, stroke_width=(.1,.1))
+writeSVG('sortedgroups.svg', sortedgroups2, height=800, stroke_width=(.1,.1))
 
 
 
