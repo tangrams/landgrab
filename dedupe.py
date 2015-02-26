@@ -18,7 +18,7 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles"
+path = "tiles1"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
@@ -38,6 +38,7 @@ class Tile:
         self.x = x
         self.y = y
         self.data = data
+        self.bbox = [[0,0],[0,0]]
         # self.polys = polygons
 
 for t in files:
@@ -53,10 +54,15 @@ for t in files:
 
 print "Processing", len(tiles), "tiles"
 
-allpolyslist = []
-allpolys = []
-polys = []
-polysset = set()
+# naming conventions for clarity:
+# "jpoly" will be a polygon defined in json - "poly" will be a Polygon()
+# "jcontour" will be a contour of a jpoly - "contour", that of a poly
+
+# a flat list of all the polygons in the scene
+alljpolys = []
+
+# a set of all the polys in the scene
+jpolysset = set()
 dupes = []
 count = 0
 for t in tiles:
@@ -69,11 +75,11 @@ for t in tiles:
     # for each building
     buildings = j["buildings"]["features"]
     for b in buildings:
-        poly = set()
+        jpoly = set()
         contours = b["geometry"]["coordinates"]
         # if len(contours) > 1: 
 
-        # for each contour in the poly
+        # for each contour in the jpoly
         for c in contours:
             count += 1
             # remove last redundant coordinate from each contour
@@ -83,20 +89,20 @@ for t in tiles:
                 # offset all verts in tile to arrange in scenespace
                 v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
             tuplec = tuple(tuple(i) for i in c)
-            poly.add(tuplec)
+            jpoly.add(tuplec)
 
-        allpolyslist.append(tuple(poly))
-        polysset.add(tuple(poly))
+        alljpolys.append(tuple(jpoly))
+        jpolysset.add(tuple(jpoly))
 
-polyslist = list(polysset)
+jpolyslist = list(jpolysset)
 
 
 
 
 ## convert json polys to Polygon objects
-
+allpolys = []
 # first, the polys from the list (everything in the json)
-for p in allpolyslist:
+for p in alljpolys:
     poly = Polygon()
     poly.sources = []
     for c in p:
@@ -106,7 +112,8 @@ for p in allpolyslist:
 # print "length allpolys:", len(allpolys)
 
 # then, the polys from the set (no duplicates)
-for p in polyslist:
+polys = []
+for p in jpolyslist:
     poly = Polygon()
     for c in p:
         poly.addContour(c)
@@ -114,29 +121,6 @@ for p in polyslist:
 
 print "number of contours", count
 print "length polys", len(polys)
-
-
-# then the difference between them
-# diffpolys = []
-# for p in difference:
-#     poly = Polygon()
-#     for c in p:
-#         poly.addContour(c)
-#     diffpolys.append(poly)
-
-## test
-# writeSVG('polys.svg', polys)
-# writeSVG('allpolys.svg', allpolys)
-# writeSVG('difference.svg', diffpolys)
-
-
-
-# find and delete duplicate polys - done through use of a set
-# find overlapping polys - collision detect
-# group colliding polygons
-# determine which is the "master" poly for each group
-# assign each group to a tile by centroid of master poly
-# write the trimmed tiles back out
 
 print "checking polys for overlap"
 groups = [] # all buildings
@@ -228,6 +212,15 @@ writeSVG('area.svg', areas, height=800, stroke_width=(.2,.2), fill_opacity=((0),
 sys.exit()
 
 
+
+## TODO
+# track jpoly ids during Polygon() conversion
+# check ids of all polys after conversion and remove jpolys not in the list
+# group overlapping polys
+# determine which is the "master" poly for each group
+# assign each group to a tile by centroid of master poly
+# move grouped jpolys to the appropriate tile
+# write json tiles back out
 
 
 
