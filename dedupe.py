@@ -79,6 +79,9 @@ for t in tiles:
         contours = b["geometry"]["coordinates"]
         # if len(contours) > 1: 
 
+        # new Polygon object
+        poly = Polygon()
+
         # for each contour in the jpoly
         for c in contours:
             count += 1
@@ -90,6 +93,8 @@ for t in tiles:
                 v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
             tuplec = tuple(tuple(i) for i in c)
             jpoly.add(tuplec)
+
+            poly.addContour(c)
 
         alljpolys.append(tuple(jpoly))
         jpolysset.add(tuple(jpoly))
