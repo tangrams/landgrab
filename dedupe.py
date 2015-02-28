@@ -18,7 +18,7 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles1"
+path = "tiles"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
@@ -38,7 +38,7 @@ class Tile:
         self.x = x
         self.y = y
         self.data = data
-        self.bbox = [[0,0],[0,0]]
+        self.bbox = [inf,inf,-inf,-inf]
         # self.polys = polygons
 
 for t in files:
@@ -58,29 +58,37 @@ print "Processing", len(tiles), "tiles"
 # "jpoly" will be a polygon defined in json - "poly" will be a Polygon()
 # "jcontour" will be a contour of a jpoly - "contour", that of a poly
 
+# expand bbox1 to include bbox2
+def updateBbox(bbox1, bbox2):
+    new = [bbox1[0], bbox1[1], bbox1[2], bbox1[3]]
+    new[0] = min(bbox1[0], bbox2[0])
+    new[1] = min(bbox1[1], bbox2[1])
+    new[2] = max(bbox1[2], bbox2[2])
+    new[3] = max(bbox1[3], bbox2[3])
+    return new
+
 # a flat list of all the polygons in the scene
 alljpolys = []
 
-# a set of all the polys in the scene
+# create a non-duplicated set of all the jpolys in the scene
 jpolysset = set()
 dupes = []
 count = 0
 for t in tiles:
     j = json.loads(t.data)
-    # print "t.data", t.data, "\n\n\n\n\n\n\n\n\n\n\n"
-    # t.json = j
-    # t.polys = j
-    # sys.exit()
 
     # for each building
     buildings = j["buildings"]["features"]
     for b in buildings:
+        # make a non-duplicating set of all the contours in the jpoly
         jpoly = set()
         contours = b["geometry"]["coordinates"]
+        id = b["id"]
         # if len(contours) > 1: 
 
         # new Polygon object
         poly = Polygon()
+        poly.id = id
 
         # for each contour in the jpoly
         for c in contours:
@@ -95,6 +103,8 @@ for t in tiles:
             jpoly.add(tuplec)
 
             poly.addContour(c)
+            # update tile's bbox with contour's bbox
+            t.bbox = updateBbox(t.bbox, list(poly.boundingBox()))
 
         alljpolys.append(tuple(jpoly))
         jpolysset.add(tuple(jpoly))
@@ -136,6 +146,7 @@ areas = set()
 sortedpolys = []
 count = 0
 total = np.float64(np.sum(range(len(polys)))*2)
+
 
 def checkGroups(poly):
     # print len(groups)
