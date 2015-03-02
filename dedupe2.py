@@ -37,20 +37,18 @@ def xtolong(x, z):
     return x / pow(2.0, z) * 360.0 - 180
 
 def ytolat(y, z):
-    # n = math.pi - 2.0 * math.pi * y / pow(2.0, z)
     n = 2.0 ** z
-    print math.sinh((1 - 2 * y / n) * math.pi)
     lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
     return math.degrees(lat_rad)
 
 class Tile:
     def __init__(self, filename, x, y, z, data):
         self.path = filename
-        x = 19299
-        y = 24633
+        # x = 19299
+        # y = 24633
         # x = 0
         # y = 0
-        z = 2
+        # z = 16
         self.x = x
         self.y = y
         self.data = data
