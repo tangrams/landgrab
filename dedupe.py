@@ -8,7 +8,9 @@ from numpy import *
 import numpy as np
 import xml.etree.ElementTree as ET
 import pprint
+import inspect
 from Polygon import *
+# from Polygon.Utils import *
 from Polygon.IO import *
 # OSMID=sys.argv[1]
 # zoom=int(sys.argv[2])
@@ -18,13 +20,12 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles"
+path = "tiles1"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
         # convert matches to ints and store in m
         m = [int(i) for i in p.findall(f)[0]]
-        # print m
         latlong = [m[1], m[2]]
         tilemin = [min(tilemin[0], latlong[0]), min(tilemin[1], latlong[1])]
         tilemax = [max(tilemax[0], latlong[0]), max(tilemax[1], latlong[1])]
@@ -32,14 +33,26 @@ for f in os.listdir(path):
 print "min:", tilemin, "max:", tilemax
 
 tiles = []
+
+def xtolong(x, z):
+    return x / pow(2.0, z) * 360.0 - 180
+
+def ytolat(y, z):
+    n = 2.0 ** z
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+    return math.degrees(lat_rad)
+
 class Tile:
-    def __init__(self, filename, x, y, data):
+    def __init__(self, filename, x, y, z, data):
         self.path = filename
         self.x = x
         self.y = y
         self.data = data
+
+        self.bounds = Polygon(((xtolong(x,z), ytolat(y,z)), (xtolong(x+1,z), ytolat(y,z)), (xtolong(x+1,z), ytolat(y+1,z)), (xtolong(x,z), ytolat(y+1,z))))
+        
         self.bbox = [inf,inf,-inf,-inf]
-        # self.polys = polygons
+        self.polys = []
 
 for t in files:
     f = open(t, 'r')
@@ -47,9 +60,8 @@ for t in files:
     # run the filename through the regex - m = saved matches 
     # example: [15, 9646, 12319]
     m = [int(i) for i in p.findall(t)[0]]
-    # print m
     filedata = f.read()
-    tile = Tile(t, m[1], m[2], filedata)
+    tile = Tile(t, m[1], m[2], m[0], filedata)
     tiles.append(tile)
 
 print "Processing", len(tiles), "tiles"
@@ -67,176 +79,276 @@ def updateBbox(bbox1, bbox2):
     new[3] = max(bbox1[3], bbox2[3])
     return new
 
+def overlapsEnough(p, q):
+    if p.overlaps(q):
+        if ((p & q).area() > 5e-09):
+            return True
+    return False
+
+def centroid(p):
+    c = [0,0]
+    for v in p[0]:
+        c = [c[0]+v[0], c[1]+v[1]]
+    return (c[0]/len(p[0]), c[1]/len(p[0]))
+
 # a flat list of all the polygons in the scene
-alljpolys = []
+# alljpolys = []
 
 # create a non-duplicated set of all the jpolys in the scene
-jpolysset = set()
-dupes = []
-count = 0
+# buildingcount = 0
+# contourcount = 0
+
+
+
+
+## convert json polys to Polygon() objects
+
 for t in tiles:
     j = json.loads(t.data)
 
     # for each building
     buildings = j["buildings"]["features"]
     for b in buildings:
-        # make a non-duplicating set of all the contours in the jpoly
-        jpoly = set()
+        # buildingcount += 1
+        # make a list of all the contours in the jpoly
         contours = b["geometry"]["coordinates"]
-        id = b["id"]
-        # if len(contours) > 1: 
-
+        if not b["id"]:
+            print "whoa"
+            sys.exit()
+        
         # new Polygon object
         poly = Polygon()
-        poly.id = id
+        poly.id = b["id"]
 
         # for each contour in the jpoly
         for c in contours:
-            count += 1
+            # contourcount += 1
             # remove last redundant coordinate from each contour
             del c[-1]
             # for each vertex
-            for v in c:
+            # for v in c:
                 # offset all verts in tile to arrange in scenespace
-                v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
-            tuplec = tuple(tuple(i) for i in c)
-            jpoly.add(tuplec)
+                # this isn't necessary when the data is coming straight from the json,
+                # only when the data is coming from a tangram vbo
+                # v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
 
             poly.addContour(c)
             # update tile's bbox with contour's bbox
             t.bbox = updateBbox(t.bbox, list(poly.boundingBox()))
 
-        alljpolys.append(tuple(jpoly))
-        jpolysset.add(tuple(jpoly))
+        t.polys.append(poly)
 
-jpolyslist = list(jpolysset)
-
-
-
-
-## convert json polys to Polygon objects
-allpolys = []
-# first, the polys from the list (everything in the json)
-for p in alljpolys:
-    poly = Polygon()
-    poly.sources = []
-    for c in p:
-        poly.addContour(c)
-        poly.sources.append(c)
-    allpolys.append(poly)
-# print "length allpolys:", len(allpolys)
-
-# then, the polys from the set (no duplicates)
+# polys = [p for p in t.polys for t in tiles]
+# print len(polys)
 polys = []
-for p in jpolyslist:
-    poly = Polygon()
-    for c in p:
-        poly.addContour(c)
-    polys.append(poly)
+for t in tiles:
+    for p in t.polys:
+        if p[0] == [(-73.9874267578125, 40.743095232181844), (-73.98193359375, 40.743095232181844), (-73.98193359375, 40.73893324113602), (-73.9874267578125, 40.73893324113602)]:
+            print "FOUND", p.id
+        polys.append(p)
+print len(polys)
 
-print "number of contours", count
-print "length polys", len(polys)
-
-print "checking polys for overlap"
+print "checking", len(polys), "polys for overlap"
 groups = [] # all buildings
 contains = [] # all shapes which completely contain other shapes
-overlaps = set() # all shapes which touch other shapes
+overlaps = [] # all shapes which touch other shapes
 area = []
-areas = set()
+areas = []
 sortedpolys = []
 count = 0
 total = np.float64(np.sum(range(len(polys)))*2)
 
+# check for intersection of two bounding boxes
+def bboxIntersect(bbox1, bbox2):
+    if (bbox1[2]<bbox2[0] or bbox2[2]<bbox1[0] or bbox1[3]<bbox2[1] or bbox2[3]<bbox1[1]):
+        return False
+    else:
+        return True
 
-def checkGroups(poly):
-    # print len(groups)
-    for g in groups:
-        for q in g:
-            if (not poly == q) and poly.overlaps(q):
-                g.append(poly)
-                if (p & q).area() > 3.67591371814e-08:
-                        areas.update([p, q])
-                return True
-    return False
+## Group overlapping polygons and assign whole groups to tiles
 
-for i, p in enumerate(polys):
-    # skip polys which have already been grouped by a previous match
-    # if i not in sortedpolys:
-    #     sortedpolys.append(i)
-        # check polygon against all grouped polygons
-        # if checkGroups(p):
-            # skip to next poly
-            # continue
+grouped = []
+toremove = []
 
-    # if not, start a new group
-    group = [p]
-    area = [p]
+# for every tile
+for i, tile in enumerate(tiles):
+    # for every poly in the tile
+    for j, p in enumerate(tile.polys):
 
-    # check polygon against all ungrouped polygons
-    for j, q in enumerate(polys):
-        count = j+(i*len(polys))
-        if count % (int(float(total)/100)) == 0:
-            stdout.write("\r%d%%" % abs(round((count/total * 100), 0)))
-            stdout.flush()
-        if not i == j:
-            # check for any touching
-            if p.overlaps(q):
-                group.append(q)
+        # progress percentage indicator
+        percent = abs(round(((len(groups)+len(toremove))/len(polys) * 100), 0))
+        # percent += 50 * i
+        stdout.write("\r%d%%"%percent)
+        stdout.flush()
+        
+        # if this is a copy of one we've already seen:
+        if p.id in grouped:
+            # it is redundant, mark it for removal
+            toremove.append([tile, p])
+            # skip to the next poly
+            continue
 
-    groups.append(group)
-    # if the group has more than one element
-    if len(group) > 1:
-        overlaps.add(tuple(group))
+        # otherwise, add it to the register
+        grouped.append(p.id)        
+        # start a new group
+        group = [p]
+
+        groupsToJoin = set()
+        # check overlaps with polys in preexisting groups first
+        for k, g in enumerate(groups):
+            for poly in g:
+                # if p.id != poly.id and p.overlaps(poly):
+                if p.id != poly.id and overlapsEnough(p, poly):
+                    groupsToJoin.add(k)
+
+        groupsToJoin = list(groupsToJoin)
+
+        # combine and flatten all implicated groups into the new group
+        for i in groupsToJoin: group += groups[i]
+        # once the combination is done, delete the implicated groups
+        # (slightly more complex because groupsToJoin is a list of indices)
+        # set groups to be the list all the elements which aren't indexed in groupsToJoin
+        groups[:] = [x for ind, x in enumerate(groups) if ind not in groupsToJoin]
+
+        # check against all other polys in all other tiles
+        for t in tiles:
+            # skip self, skip any tiles whose bbox doesn't overlap self's bbox
+            if (tile == t) or (not bboxIntersect(tile.bbox, t.bbox)): continue
+
+            # now checking tile.polys[p] against all polys 'q' in t.polys
+            for q in t.polys:
+                # if q is a copy of p
+                if p.id == q.id:
+                    # mark it for removal
+                    toremove.append([t, q])
+                    # skip to next q poly
+                    continue
+                # if p.overlaps(q):
+                if overlapsEnough(p, q):
+                    if len(group) > 100:
+                        print p.id
+                        sys.exit()
+                    good = True
+                    # if q is already in the group, mark it for removal
+                    for x in group:
+                        if x.id == q.id:
+                            toremove.append([t, q])
+                            good = False
+                    # otherwise add q to the group
+                    if good: group.append(q)
+
+        groups.append(group)
+
+
+stdout.write("\r100%\n")
+stdout.flush() 
+
+for g in groups:
+    if len(g) > 1:
+        overlaps.append(g)
+
+print ""
+print "polys:", len(polys)
+print "groups:", len(grouped)
+print "removed:", len(toremove)
+print ""
+
+
+# remove redundant polys
+# each entry is a list: [tile, poly]
+for r in toremove:
+    if r[1] in r[0].polys:
+        r[0].polys.remove(r[1])
+
+# assign groups to tiles
+for g in groups:
+    # sort all polys in group by area
+    g.sort(key=lambda p: p.area)
+    # assume poly with largest area is the outermost polygon
+    outer = g[0]
+    # find "home" tile in which the outer's centroid lies
+    c = centroid(outer)
+    home = None
+    for i, t in enumerate(tiles):
+        if t.bounds.isInside(c[0], c[1]):
+            home = t
+    # if the poly's centroid is outside of all the tiles,
+    # the poly is homeless - leave it where it is for now
+    if home == None:
+        # skip to the next group
+        continue
+
+    # for each polygon in the group
+    for p in g:
+        # copy poly to home tile
+        if home != "":
+            home.polys.append(p)
+        # remove from all other tiles
+        for t in tiles:
+            if t != home:
+                if p in t.polys:
+                    t.polys.remove(p)
+
+
+
+
+
+# flatten lists for writing to svg
+groups2 = [item for sublist in groups for item in sublist] 
+overlaps2 = [item for sublist in overlaps for item in sublist] 
+
+overlap_count = len(overlaps2)
 
 
 
 stdout.write("\r100%\n")
 stdout.flush() 
-# sort areas groups by apparent area
-# print areas[0]
-
-groups2 = [item for sublist in groups for item in sublist] 
-overlaps2 = [item for sublist in overlaps for item in sublist] 
-groups2 = list(set(groups2))
-overlaps2 = list(set(overlaps2))
-overlap_count = len(overlaps2)
-
-print "checking overlap areas:"
-for i, g in enumerate(overlaps2):
-    if i % (int(float(overlap_count)/100)) == 0:
-            stdout.write("\r%d%%" % abs(round((i/overlap_count * 100), 0)))
-            stdout.flush()
-    for h in overlaps2: 
-        # check for overlap greater than some area:
-        if not (g == h) and ((g & h).area() > 5e-09):
-            areas.update([g, h])
-
 
 print ""
-print "polys in groups:", len(groups2)
-print "strict overlaps:", len(overlaps2)
-print "area overlaps:", len(areas)
 
-areas = list(areas)
+# add tile bounds to polys list, to visualize it in the svg
+for t in tiles:
+    t.polys.append(t.bounds)
 
-writeSVG('groups.svg', groups2, height=800, stroke_width=(.2,.2), fill_opacity=((0),), )
-writeSVG('overlaps.svg', overlaps2, height=800, stroke_width=(.2,.2), fill_opacity=((0),), )
-writeSVG('area.svg', areas, height=800, stroke_width=(.2,.2), fill_opacity=((0),), )
-
-
+for i, t in enumerate(tiles):
+    writeSVG('t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(i*.1,i*.1), fill_opacity=((0),), )
 
 sys.exit()
+
+# done!
+
+
+
 
 
 
 ## TODO
-# track jpoly ids during Polygon() conversion
 # check ids of all polys after conversion and remove jpolys not in the list
-# group overlapping polys
-# determine which is the "master" poly for each group
-# assign each group to a tile by centroid of master poly
-# move grouped jpolys to the appropriate tile
 # write json tiles back out
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -302,85 +414,6 @@ def metersForTile(tile):
         "y": -(tile['y'] * half_circumference_meters * 2 / pow(2, tile.z) - half_circumference_meters)
     }
 
-##
-## PROCESSING
-##
-
-## find boundingbox of latlongs
-# minx = 180.
-# maxx = -180.
-# miny = 90.
-# maxy = -90.
-print "Processing:"
-
-for node in root:
-    if node.tag == "node":
-        lat = float(node.attrib["lat"])
-        lon = float(node.attrib["lon"])
-        points.append({'y':lat, 'x':lon})
-#         minx = min(minx, lon)
-#         maxx = max(maxx, lon)
-#         miny = min(miny, lat)
-#         maxy = max(maxy, lat)
-# print miny, minx, maxy, maxx
-
-## find tile
-for point in points:
-    tiles.append(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom))
-
-## de-dupe
-tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
-
-## patch holes in tileset
-
-## get min and max tiles for lat and long
-
-minx = 1048577
-maxx = -1
-miny = 1048577
-maxy = -1
-
-for tile in tiles:
-    minx = min(minx, tile['x'])
-    maxx = max(maxx, tile['x'])
-    miny = min(miny, tile['y'])
-    maxy = max(maxy, tile['y'])
-# print miny, minx, maxy, maxx
-
-newtiles = []
-
-for tile in tiles:
-    # find furthest tiles from this tile on x and y axes
-    x = tile['x']
-    lessx = 1048577
-    morex = -1
-    y = tile['y']
-    lessy = 1048577
-    morey = -1
-    for t in tiles:
-        if int(t['x']) == int(tile['x']):
-            # check on y axis
-            lessy = min(lessy, t['y'])
-            morey = max(morey, t['y'])
-        if int(t['y']) == int(tile['y']):
-            # check on x axis
-            lessx = min(lessx, t['x'])
-            morex = max(morex, t['x'])
-
-    # if a tile is found which is not directly adjacent, add all the tiles between the two
-    if (lessy + 2) < tile['y']:
-        for i in range(int(lessy+1), int(tile['y'])):
-            newtiles.append({'x':tile['x'],'y':i, 'z':zoom})
-    if (morey - 2) > tile['y']:
-        for i in range(int(morey-1), int(tile['y'])):
-            newtiles.append({'x':tile['x'],'y':i, 'z':zoom})
-    if (lessx + 2) < tile['x']:
-        for i in range(int(lessx+1), int(tile['x'])):
-            newtiles.append({'x':i,'y':tile['y'], 'z':zoom})
-    if (morex - 2) > tile['x']:
-        for i in range(int(morex-1), int(tile['x'])):
-            newtiles.append({'x':i,'y':tile['y'], 'z':zoom})
-
 ## de-dupe
 newtiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in newtiles)]
 ## add fill tiles to boundary tiles
@@ -391,7 +424,7 @@ tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in ti
 
 if coordsonly == 1:
     ## output coords
-    pprint.pprint(tiles)
+    # pprint.pprint(tiles)
     print "Finished: %i tiles at zoom level %i" % (len(tiles), zoom)
 else:
     ## download tiles
