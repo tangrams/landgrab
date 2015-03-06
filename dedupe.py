@@ -6,9 +6,10 @@ import requests, json, time, math, re, sys, os
 from sys import stdout
 from numpy import *
 import numpy as np
+import colorsys
 import xml.etree.ElementTree as ET
 import pprint
-import inspect
+from random import randint
 from Polygon import *
 # from Polygon.Utils import *
 from Polygon.IO import *
@@ -20,7 +21,7 @@ inf = float('inf')
 tilemin = [inf, inf]
 tilemax = [0, 0]
 p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles1"
+path = "tiles"
 for f in os.listdir(path):
     if f.endswith(".json"):
         files.append(path+"/"+f)
@@ -30,7 +31,7 @@ for f in os.listdir(path):
         tilemin = [min(tilemin[0], latlong[0]), min(tilemin[1], latlong[1])]
         tilemax = [max(tilemax[0], latlong[0]), max(tilemax[1], latlong[1])]
 
-print "min:", tilemin, "max:", tilemax
+# print "min:", tilemin, "max:", tilemax
 
 tiles = []
 
@@ -64,7 +65,7 @@ for t in files:
     tile = Tile(t, m[1], m[2], m[0], filedata)
     tiles.append(tile)
 
-print "Processing", len(tiles), "tiles"
+print "Processing", len(tiles), "tiles:"
 
 # naming conventions for clarity:
 # "jpoly" will be a polygon defined in json - "poly" will be a Polygon()
@@ -103,7 +104,10 @@ def centroid(p):
 
 ## convert json polys to Polygon() objects
 
-for t in tiles:
+for i, t in enumerate(tiles):
+    percent = abs(round(( i / len(tiles) * 100), 0))
+    stdout.write("\r%d%%"%percent)
+    stdout.flush()
     j = json.loads(t.data)
 
     # for each building
@@ -138,17 +142,17 @@ for t in tiles:
 
         t.polys.append(poly)
 
+stdout.write("\r100%\n")
+stdout.flush()
+
 # polys = [p for p in t.polys for t in tiles]
 # print len(polys)
 polys = []
 for t in tiles:
     for p in t.polys:
-        if p[0] == [(-73.9874267578125, 40.743095232181844), (-73.98193359375, 40.743095232181844), (-73.98193359375, 40.73893324113602), (-73.9874267578125, 40.73893324113602)]:
-            print "FOUND", p.id
         polys.append(p)
-print len(polys)
 
-print "checking", len(polys), "polys for overlap"
+print "\nChecking", len(polys), "polys for overlap:"
 groups = [] # all buildings
 contains = [] # all shapes which completely contain other shapes
 overlaps = [] # all shapes which touch other shapes
@@ -176,8 +180,7 @@ for i, tile in enumerate(tiles):
     for j, p in enumerate(tile.polys):
 
         # progress percentage indicator
-        percent = abs(round(((len(groups)+len(toremove))/len(polys) * 100), 0))
-        # percent += 50 * i
+        percent = abs(round(((len(grouped))/len(polys) * 100), 0))
         stdout.write("\r%d%%"%percent)
         stdout.flush()
         
@@ -247,11 +250,9 @@ for g in groups:
     if len(g) > 1:
         overlaps.append(g)
 
-print ""
-print "polys:", len(polys)
-print "groups:", len(grouped)
-print "removed:", len(toremove)
-print ""
+# print "groups:", len(grouped)
+# print "removed:", len(toremove)
+print "\nAssigning", len(groups), "groups to tiles:"
 
 
 # remove redundant polys
@@ -304,14 +305,30 @@ overlap_count = len(overlaps2)
 stdout.write("\r100%\n")
 stdout.flush() 
 
-print ""
+## SVG OUTPUT
 
-# add tile bounds to polys list, to visualize it in the svg
-for t in tiles:
-    t.polys.append(t.bounds)
-
+# color each tile randomly
+strokecolor = ()
+allpolys = []
 for i, t in enumerate(tiles):
-    writeSVG('t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(i*.1,i*.1), fill_opacity=((0),), )
+    color = ((colorsys.hsv_to_rgb(random.random(), 1., 1.)),)
+    color = (tuple([int(i*255) for i in list(color[0])]),)
+    # add tile bounds to polys list, to visualize it in the svg
+    allpolys.append(t.bounds)
+    # add a color entry, to color the boundary
+    strokecolor += color
+    for p in t.polys:
+        # add the poly to the poly list and a corresponding color entry to the colors list
+        allpolys.append(p)
+        strokecolor += color
+    # writeSVG('t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
+
+# strokecolor = ((0, 0, 0), (255, 0, 0), (0, 255, 0))
+# print strokecolor
+# writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
+# writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=strokecolor, fill_opacity=((0),), )
+# writeSVG('allpolys.svg', allpolys, height=800, stroke_width=(1, 1), fill_opacity=((0),), )
+writeSVG('allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
 
 sys.exit()
 
