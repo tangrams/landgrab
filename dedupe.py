@@ -1,47 +1,43 @@
-# todo: handle cases where the boundary crosses the dateline
+#!/usr/bin/python
+# -*- coding: iso-8859-15 -*-
 
-# from __future__ import print_function
+## dedupe.py
+## Peter Richardson, March 2015
+##
+## Remove duplicate features from a set of geojson tiles,
+## group overlapping features in a FeatureCollection
+## and move them all to a single tile based on the group's
+## center of gravity
+##
+## Uses Polygon2 by Jörg Rädler
+## https://bitbucket.org/jraedler/polygon2
+
 from __future__ import division
-import requests, json, time, math, re, sys, os
+import requests, json, time, datetime, math, re, sys, os
 from sys import stdout
 from numpy import *
 import numpy as np
 import colorsys
 import xml.etree.ElementTree as ET
-import pprint
 from random import randint
 from Polygon import *
-# from Polygon.Utils import *
 from Polygon.IO import *
 # OSMID=sys.argv[1]
 # zoom=int(sys.argv[2])
 
-files = []
-inf = float('inf')
-tilemin = [inf, inf]
-tilemax = [0, 0]
-p = re.compile('(\d*)-(\d*)-(\d*).*')
-path = "tiles"
-for f in os.listdir(path):
-    if f.endswith(".json"):
-        files.append(path+"/"+f)
-        # convert matches to ints and store in m
-        m = [int(i) for i in p.findall(f)[0]]
-        latlong = [m[1], m[2]]
-        tilemin = [min(tilemin[0], latlong[0]), min(tilemin[1], latlong[1])]
-        tilemax = [max(tilemax[0], latlong[0]), max(tilemax[1], latlong[1])]
 
-# print "min:", tilemin, "max:", tilemax
 
-tiles = []
+## location of .json files to process -
+## eg: path = "tiles" will look inside ./tiles/
 
-def xtolong(x, z):
-    return x / pow(2.0, z) * 360.0 - 180
+path = "manhattan/tiles2"
 
-def ytolat(y, z):
-    n = 2.0 ** z
-    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
-    return math.degrees(lat_rad)
+
+
+
+##
+## class and function definitions
+##
 
 class Tile:
     def __init__(self, filename, x, y, z, data):
@@ -55,21 +51,15 @@ class Tile:
         self.bbox = [inf,inf,-inf,-inf]
         self.polys = []
 
-for t in files:
-    f = open(t, 'r')
 
-    # run the filename through the regex - m = saved matches 
-    # example: [15, 9646, 12319]
-    m = [int(i) for i in p.findall(t)[0]]
-    filedata = f.read()
-    tile = Tile(t, m[1], m[2], m[0], filedata)
-    tiles.append(tile)
+def xtolong(x, z):
+    return x / pow(2.0, z) * 360.0 - 180
 
-print "Processing", len(tiles), "tiles:"
+def ytolat(y, z):
+    n = 2.0 ** z
+    lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * y / n)))
+    return math.degrees(lat_rad)
 
-# naming conventions for clarity:
-# "jpoly" will be a polygon defined in json - "poly" will be a Polygon()
-# "jcontour" will be a contour of a jpoly - "contour", that of a poly
 
 # expand bbox1 to include bbox2
 def updateBbox(bbox1, bbox2):
@@ -80,34 +70,83 @@ def updateBbox(bbox1, bbox2):
     new[3] = max(bbox1[3], bbox2[3])
     return new
 
+# check for overlaps of a minimum area
 def overlapsEnough(p, q):
     if p.overlaps(q):
-        if ((p & q).area() > 5e-09):
+        if ((p & q).area() > 5e-09): # magic number
             return True
     return False
 
+# find the center of gravity of a polygon (average vertex position)
 def centroid(p):
     c = [0,0]
     for v in p[0]:
         c = [c[0]+v[0], c[1]+v[1]]
     return (c[0]/len(p[0]), c[1]/len(p[0]))
 
-# a flat list of all the polygons in the scene
-# alljpolys = []
 
-# create a non-duplicated set of all the jpolys in the scene
-# buildingcount = 0
-# contourcount = 0
+# check for intersection of two bounding boxes
+def bboxIntersect(bbox1, bbox2):
+    if (bbox1[2]<bbox2[0] or bbox2[2]<bbox1[0] or bbox1[3]<bbox2[1] or bbox2[3]<bbox1[1]):
+        return False
+    else:
+        return True
+
+# write repeadedly to stdout on a single line
+def status(string):
+    stdout.write("\r"+string)
+    stdout.flush()
+
+start_time = time.time()
+
+##
+## import files and assign to Tile objects
+##
+
+files = []
+inf = float('inf')
+tilemin = [inf, inf]
+tilemax = [0, 0]
+p = re.compile('(\d*)-(\d*)-(\d*).*')
+for f in os.listdir(path):
+    if f.endswith(".json"):
+        files.append(path+"/"+f)
+        # convert matches to ints and store in m
+        m = [int(i) for i in p.findall(f)[0]]
+        latlong = [m[1], m[2]]
+        tilemin = [min(tilemin[0], latlong[0]), min(tilemin[1], latlong[1])]
+        tilemax = [max(tilemax[0], latlong[0]), max(tilemax[1], latlong[1])]
+
+# print "min:", tilemin, "max:", tilemax
+
+tiles = []
+
+for t in files:
+    f = open(t, 'r')
+
+    # run the filename through the regex
+    # m = saved matches 
+    # example: [15, 9646, 12319]
+    m = [int(i) for i in p.findall(t)[0]]
+    filedata = f.read()
+    tile = Tile(t, m[1], m[2], m[0], filedata)
+    tiles.append(tile)
+
+print "Processing", len(tiles), "tiles:"
 
 
-
-
+##
 ## convert json polys to Polygon() objects
+##
+
+# naming conventions for clarity:
+# "jpoly" will be a polygon defined in json - "poly" will be a Polygon()
+# "jcontour" will be a contour of a jpoly - "contour", that of a poly
+
 
 for i, t in enumerate(tiles):
     percent = abs(round(( i / len(tiles) * 100), 0))
-    stdout.write("\r%d%%"%percent)
-    stdout.flush()
+    status("%d%%"%percent)
     j = json.loads(t.data)
 
     # for each building
@@ -142,8 +181,7 @@ for i, t in enumerate(tiles):
 
         t.polys.append(poly)
 
-stdout.write("\r100%\n")
-stdout.flush()
+status("100%")
 
 # polys = [p for p in t.polys for t in tiles]
 # print len(polys)
@@ -153,25 +191,26 @@ for t in tiles:
         polys.append(p)
 
 print "\nChecking", len(polys), "polys for overlap:"
+
 groups = [] # all buildings
+
+# debugging groups
 contains = [] # all shapes which completely contain other shapes
 overlaps = [] # all shapes which touch other shapes
-area = []
-areas = []
-sortedpolys = []
-count = 0
+
+# still get overflow errors on this for large zoom values but it
+# doesn't seem to hurt anything
 total = np.float64(np.sum(range(len(polys)))*2)
 
-# check for intersection of two bounding boxes
-def bboxIntersect(bbox1, bbox2):
-    if (bbox1[2]<bbox2[0] or bbox2[2]<bbox1[0] or bbox1[3]<bbox2[1] or bbox2[3]<bbox1[1]):
-        return False
-    else:
-        return True
 
+
+##
 ## Group overlapping polygons and assign whole groups to tiles
+##
 
+# poly ids which have been grouped
 grouped = []
+# redundant tile polys to remove once the loop is complete
 toremove = []
 
 # for every tile
@@ -181,12 +220,13 @@ for i, tile in enumerate(tiles):
 
         # progress percentage indicator
         percent = abs(round(((len(grouped))/len(polys) * 100), 0))
-        stdout.write("\r%d%%"%percent)
-        stdout.flush()
+        status("%d%%"%percent)
         
         # if this is a copy of one we've already seen:
         if p.id in grouped:
             # it is redundant, mark it for removal
+            # (can't remove an item from an array we're iterating over,
+            # it'd throw off the index count and the loop would skip an item)
             toremove.append([tile, p])
             # skip to the next poly
             continue
@@ -226,11 +266,8 @@ for i, tile in enumerate(tiles):
                     toremove.append([t, q])
                     # skip to next q poly
                     continue
-                # if p.overlaps(q):
+                # if p overlaps q significantly:
                 if overlapsEnough(p, q):
-                    if len(group) > 100:
-                        print p.id
-                        sys.exit()
                     good = True
                     # if q is already in the group, mark it for removal
                     for x in group:
@@ -243,8 +280,7 @@ for i, tile in enumerate(tiles):
         groups.append(group)
 
 
-stdout.write("\r100%\n")
-stdout.flush() 
+status("100%")
 
 for g in groups:
     if len(g) > 1:
@@ -302,8 +338,7 @@ overlap_count = len(overlaps2)
 
 
 
-stdout.write("\r100%\n")
-stdout.flush() 
+status("100%")
 
 ## SVG OUTPUT
 
@@ -328,8 +363,10 @@ for i, t in enumerate(tiles):
 # writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
 # writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=strokecolor, fill_opacity=((0),), )
 # writeSVG('allpolys.svg', allpolys, height=800, stroke_width=(1, 1), fill_opacity=((0),), )
-writeSVG('allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
+writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
 
+elapsed = time.time() - start_time
+print "\nDone in", datetime.timedelta(seconds=elapsed)
 sys.exit()
 
 # done!
@@ -441,14 +478,13 @@ tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in ti
 
 if coordsonly == 1:
     ## output coords
-    # pprint.pprint(tiles)
     print "Finished: %i tiles at zoom level %i" % (len(tiles), zoom)
 else:
     ## download tiles
     print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
 
     ## make/empty the tiles folder
-    folder = "tiles1"
+    folder = "tiles"
     if not os.path.exists(folder):
         os.makedirs(folder)
 
