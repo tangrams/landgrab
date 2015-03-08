@@ -309,12 +309,17 @@ for i, r in enumerate(toremove):
 
     if r[1] in r[0].polys:
 
-        # find the associated source json
-        j = next((f for f in r[0].parsed["buildings"]["features"] if f["id"] == r[1].id), None)
-        # and remove it
-        r[0].parsed["buildings"]["features"].remove(j)
+        # this seems to be unnecessary - a single json tile typically has no dupes
+        # # find the associated source json
+        # # if it's in there more than once
+        # if sum(f["id"] == r[1].id for f in r[0].parsed["buildings"]["features"]) > 1:
+        #     j = next((f for f in r[0].parsed["buildings"]["features"] if f["id"] == r[1].id), None)
+        #     # remove it
+        #     if j != None:
+        #         r[0].parsed["buildings"]["features"].remove(j)
+        #         # del j
 
-        # then remove the poly from the tile's poly list
+        # remove the poly from the tile's poly list
         r[0].polys.remove(r[1])
 
 printStatus("100%")
@@ -363,7 +368,7 @@ for i, g in enumerate(groups):
                 # find and remove the json
                 for f in t.parsed["buildings"]["features"]:
                     if f["id"] == p.id:
-                        del f
+                        t.parsed["buildings"]["features"].remove(f)
 
 printStatus("100%")
 
@@ -377,7 +382,13 @@ for i, t in enumerate(tiles):
     percent = abs(round((i/len(tiles) * 100), 0))
     printStatus("%d%%"%percent)
     with open(path+'/deduped/'+t.filename, 'w') as outfile:
+
+        # # write a single layer:
+        # json.dump(t.parsed["buildings"], outfile)
+
+        # write everything:
         json.dump(t.parsed, outfile)
+
 printStatus("100%")
 
 print "\nWriting SVG"
@@ -394,7 +405,7 @@ allpolys = []
 for i, t in enumerate(tiles):
     # color each tile randomly
     color = ((colorsys.hsv_to_rgb(random.random(), 1., 1.)),)
-    color = (tuple([int(i*255) for i in list(color[0])]),)
+    color = (tuple([int(c*255) for c in list(color[0])]),)
 
     # add tile bounds to polys list, to visualize it in the svg
     allpolys.append(t.bounds)
@@ -408,7 +419,7 @@ for i, t in enumerate(tiles):
         strokecolor += color
 
     # write one svg per tile:
-    # writeSVG('t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
+    writeSVG(path+'/'+'t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
 
 # write one big svg
 writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
