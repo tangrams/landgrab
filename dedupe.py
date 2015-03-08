@@ -18,7 +18,7 @@
 ## set "path" variable below
 ## run 'python dedupe.py'
 ## svg will be written to the same path
-##
+## deduped tiles will be written to a subdir called "dedupe"
 
 from __future__ import division
 import requests, json, time, datetime, math, re, sys, os
@@ -35,7 +35,7 @@ from Polygon.IO import *
 ## eg: path = "tiles" will look inside ./tiles/
 
 # path=sys.argv[1] # future
-path = "manhattan/tiles2"
+path = "manhattan/tiles"
 
 
 
@@ -419,7 +419,8 @@ for i, t in enumerate(tiles):
         strokecolor += color
 
     # write one svg per tile:
-    writeSVG(path+'/'+'t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
+    if len(t.polys) > 0:
+        writeSVG(path+'/'+'%s.svg'%t.filename, t.polys, height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
 
 # write one big svg
 writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
