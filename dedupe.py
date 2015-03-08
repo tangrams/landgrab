@@ -11,6 +11,14 @@
 ##
 ## Uses Polygon2 by Jörg Rädler
 ## https://bitbucket.org/jraedler/polygon2
+##
+
+## USAGE
+##
+## set "path" variable below
+## run 'python dedupe.py'
+## svg will be written to the same path
+##
 
 from __future__ import division
 import requests, json, time, datetime, math, re, sys, os
@@ -22,14 +30,11 @@ import xml.etree.ElementTree as ET
 from random import randint
 from Polygon import *
 from Polygon.IO import *
-# OSMID=sys.argv[1]
-# zoom=int(sys.argv[2])
-
-
 
 ## location of .json files to process -
 ## eg: path = "tiles" will look inside ./tiles/
 
+# path=sys.argv[1] # future
 path = "manhattan/tiles2"
 
 
@@ -40,8 +45,9 @@ path = "manhattan/tiles2"
 ##
 
 class Tile:
-    def __init__(self, filename, x, y, z, data):
-        self.path = filename
+    def __init__(self, path, x, y, z, data):
+        self.path = path
+        self.filename = os.path.split(path)[1]
         self.x = x
         self.y = y
         self.data = data
@@ -93,11 +99,12 @@ def bboxIntersect(bbox1, bbox2):
         return True
 
 # write repeadedly to stdout on a single line
-def status(string):
+def printStatus(string):
     stdout.write("\r"+string)
     stdout.flush()
 
 start_time = time.time()
+
 
 ##
 ## import files and assign to Tile objects
@@ -146,18 +153,15 @@ print "Processing", len(tiles), "tiles:"
 
 for i, t in enumerate(tiles):
     percent = abs(round(( i / len(tiles) * 100), 0))
-    status("%d%%"%percent)
-    j = json.loads(t.data)
+    printStatus("%d%%"%percent)
+    t.parsed = json.loads(t.data)
 
     # for each building
-    buildings = j["buildings"]["features"]
+    buildings = t.parsed["buildings"]["features"]
     for b in buildings:
         # buildingcount += 1
         # make a list of all the contours in the jpoly
         contours = b["geometry"]["coordinates"]
-        if not b["id"]:
-            print "whoa"
-            sys.exit()
         
         # new Polygon object
         poly = Polygon()
@@ -165,9 +169,9 @@ for i, t in enumerate(tiles):
 
         # for each contour in the jpoly
         for c in contours:
-            # contourcount += 1
             # remove last redundant coordinate from each contour
             del c[-1]
+
             # for each vertex
             # for v in c:
                 # offset all verts in tile to arrange in scenespace
@@ -176,15 +180,21 @@ for i, t in enumerate(tiles):
                 # v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
 
             poly.addContour(c)
+
             # update tile's bbox with contour's bbox
             t.bbox = updateBbox(t.bbox, list(poly.boundingBox()))
 
+        poly.tile = t
         t.polys.append(poly)
 
-status("100%")
+printStatus("100%")
 
-# polys = [p for p in t.polys for t in tiles]
-# print len(polys)
+
+# make a list of all polys
+# this list comprehension is the same as the nested for loops below
+# neat, eh?
+# polys = [p for t in tiles for p in t.polys]
+
 polys = []
 for t in tiles:
     for p in t.polys:
@@ -194,7 +204,7 @@ print "\nChecking", len(polys), "polys for overlap:"
 
 groups = [] # all buildings
 
-# debugging groups
+# groups for debugging
 contains = [] # all shapes which completely contain other shapes
 overlaps = [] # all shapes which touch other shapes
 
@@ -205,7 +215,7 @@ total = np.float64(np.sum(range(len(polys)))*2)
 
 
 ##
-## Group overlapping polygons and assign whole groups to tiles
+## group overlapping polygons and assign whole groups to tiles
 ##
 
 # poly ids which have been grouped
@@ -220,7 +230,7 @@ for i, tile in enumerate(tiles):
 
         # progress percentage indicator
         percent = abs(round(((len(grouped))/len(polys) * 100), 0))
-        status("%d%%"%percent)
+        printStatus("%d%%"%percent)
         
         # if this is a copy of one we've already seen:
         if p.id in grouped:
@@ -280,7 +290,7 @@ for i, tile in enumerate(tiles):
         groups.append(group)
 
 
-status("100%")
+printStatus("100%")
 
 for g in groups:
     if len(g) > 1:
@@ -288,17 +298,35 @@ for g in groups:
 
 # print "groups:", len(grouped)
 # print "removed:", len(toremove)
-print "\nAssigning", len(groups), "groups to tiles:"
-
+print "\nRemoving", len(toremove), "redundant polys:"
 
 # remove redundant polys
 # each entry is a list: [tile, poly]
-for r in toremove:
+for i, r in enumerate(toremove):
+    # progress percentage indicator
+    percent = abs(round((i/len(toremove) * 100), 0))
+    printStatus("%d%%"%percent)
+
     if r[1] in r[0].polys:
+
+        # find the associated source json
+        j = next((f for f in r[0].parsed["buildings"]["features"] if f["id"] == r[1].id), None)
+        # and remove it
+        r[0].parsed["buildings"]["features"].remove(j)
+
+        # then remove the poly from the tile's poly list
         r[0].polys.remove(r[1])
 
+printStatus("100%")
+
+
+print "\nAssigning", len(groups), "groups to tiles:"
 # assign groups to tiles
-for g in groups:
+for i, g in enumerate(groups):
+    # progress percentage indicator
+    percent = abs(round((i/len(groups) * 100), 0))
+    printStatus("%d%%"%percent)
+
     # sort all polys in group by area
     g.sort(key=lambda p: p.area)
     # assume poly with largest area is the outermost polygon
@@ -310,216 +338,85 @@ for g in groups:
         if t.bounds.isInside(c[0], c[1]):
             home = t
     # if the poly's centroid is outside of all the tiles,
-    # the poly is homeless - leave it where it is for now
+    # just use the tile the poly started in
     if home == None:
-        # skip to the next group
-        continue
+        home = outer.tile
 
     # for each polygon in the group
     for p in g:
-        # copy poly to home tile
-        if home != "":
+        # if the poly isn't already there
+        if home != p.tile:
+            # copy poly to home tile
             home.polys.append(p)
-        # remove from all other tiles
+            # find the associated source json, using the poly's .tile attribute
+            for i, f in enumerate(p.tile.parsed["buildings"]["features"]):
+                if f["id"] == p.id:
+                    # copy it over too
+                    home.parsed["buildings"]["features"].append(f)
+
+        # remove the poly and the json from all other tiles
         for t in tiles:
             if t != home:
+                # find and remove the poly
                 if p in t.polys:
                     t.polys.remove(p)
+                # find and remove the json
+                for f in t.parsed["buildings"]["features"]:
+                    if f["id"] == p.id:
+                        del f
+
+printStatus("100%")
 
 
+print "\nWriting JSON"
+## json output
+if not os.path.exists(path+'/deduped/'):
+    os.mkdir(path+'/deduped/')
+for i, t in enumerate(tiles):
+    # progress percentage indicator
+    percent = abs(round((i/len(tiles) * 100), 0))
+    printStatus("%d%%"%percent)
+    with open(path+'/deduped/'+t.filename, 'w') as outfile:
+        json.dump(t.parsed, outfile)
+printStatus("100%")
 
-
+print "\nWriting SVG"
+## SVG output
+##
 
 # flatten lists for writing to svg
 groups2 = [item for sublist in groups for item in sublist] 
 overlaps2 = [item for sublist in overlaps for item in sublist] 
 
-overlap_count = len(overlaps2)
-
-
-
-status("100%")
-
-## SVG OUTPUT
-
-# color each tile randomly
+# 'strokecolor' parameter is a tuple of RGB values, one for each polygon
 strokecolor = ()
 allpolys = []
 for i, t in enumerate(tiles):
+    # color each tile randomly
     color = ((colorsys.hsv_to_rgb(random.random(), 1., 1.)),)
     color = (tuple([int(i*255) for i in list(color[0])]),)
+
     # add tile bounds to polys list, to visualize it in the svg
     allpolys.append(t.bounds)
-    # add a color entry, to color the boundary
+    # add a color entry for the tile bounds rectangle
     strokecolor += color
+
     for p in t.polys:
-        # add the poly to the poly list and a corresponding color entry to the colors list
+        # add the poly to the poly list
         allpolys.append(p)
+        # add a corresponding color entry to the colors list
         strokecolor += color
+
+    # write one svg per tile:
     # writeSVG('t%d.svg'%i, tiles[i].polys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
 
-# strokecolor = ((0, 0, 0), (255, 0, 0), (0, 255, 0))
-# print strokecolor
-# writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=(strokecolor,), fill_opacity=((0),), )
-# writeSVG('t%d.svg'%i, allpolys, height=800, stroke_width=(1, 1), stroke_color=strokecolor, fill_opacity=((0),), )
-# writeSVG('allpolys.svg', allpolys, height=800, stroke_width=(1, 1), fill_opacity=((0),), )
+# write one big svg
 writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
+
+printStatus("100%")
 
 elapsed = time.time() - start_time
 print "\nDone in", datetime.timedelta(seconds=elapsed)
 sys.exit()
 
 # done!
-
-
-
-
-
-
-## TODO
-# check ids of all polys after conversion and remove jpolys not in the list
-# write json tiles back out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# print r.encoding
-open('outfile.xml', 'w').close() # clear existing OUTFILE
-
-with open('outfile.xml', 'w') as fd:
-  fd.write(r.text.encode("UTF-8"))
-  fd.close()
-
-try:
-    tree = ET.parse('outfile.xml')
-except Exception, e:
-    print e
-    print "XML parse failed, please check outfile.xml"
-    sys.exit()
-
-root = tree.getroot()
-
-points = []
-tiles = []
-
-##
-## HELPER FUNCTIONS
-##
-
-tile_size = 256
-half_circumference_meters = 20037508.342789244;
-
-# Convert lat-lng to mercator meters
-def latLngToMeters( coords ):
-    y = float(coords['y'])
-    x = float(coords['x'])
-    # Latitude
-    y = math.log(math.tan(y*math.pi/360 + math.pi/4)) / math.pi
-    y *= half_circumference_meters
-
-    # Longitude
-    x *= half_circumference_meters / 180;
-
-    return {"x": x, "y": y}
-
-# convert from tile-space coords to meters, depending on zoom
-def tile_to_meters(zoom):
-    return 40075016.68557849 / pow(2, zoom)
-
-# Given a point in mercator meters and a zoom level, return the tile X/Y/Z that the point lies in
-def tileForMeters(coords, zoom):
-    y = float(coords['y'])
-    x = float(coords['x'])
-    return {
-        "x": math.floor((x + half_circumference_meters) / (half_circumference_meters * 2 / pow(2, zoom))),
-        "y": math.floor((-y + half_circumference_meters) / (half_circumference_meters * 2 / pow(2, zoom))),
-        "z": zoom
-    }
-
-# Convert tile location to mercator meters - multiply by pixels per tile, then by meters per pixel, adjust for map origin
-def metersForTile(tile):
-    return {
-        "x": tile['x'] * half_circumference_meters * 2 / pow(2, tile.z) - half_circumference_meters,
-        "y": -(tile['y'] * half_circumference_meters * 2 / pow(2, tile.z) - half_circumference_meters)
-    }
-
-## de-dupe
-newtiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in newtiles)]
-## add fill tiles to boundary tiles
-tiles = tiles + newtiles
-## de-dupe
-tiles = [dict(tupleized) for tupleized in set(tuple(item.items()) for item in tiles)]
-
-
-if coordsonly == 1:
-    ## output coords
-    print "Finished: %i tiles at zoom level %i" % (len(tiles), zoom)
-else:
-    ## download tiles
-    print "Downloading %i tiles at zoom level %i" % (len(tiles), zoom)
-
-    ## make/empty the tiles folder
-    folder = "tiles"
-    if not os.path.exists(folder):
-        os.makedirs(folder)
-
-    for the_file in os.listdir(folder):
-        file_path = os.path.join(folder, the_file)
-        try:
-            if os.path.isfile(file_path):
-                os.unlink(file_path)
-        except Exception, e:
-            print e
-
-    total = len(tiles)
-    if total == 0:
-        print("Error: no tiles")
-        exit()
-    count = 0
-    sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
-    sys.stdout.flush()
-    for tile in tiles:
-        tilename = "%i-%i-%i.json" % (zoom,tile['x'],tile['y'])
-        r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (zoom, tile['x'],tile['y']))
-        j = json.loads(r.text)
-
-        # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
-        # doing this turns each file into a valid standalone geojson files -
-        # you can replace "buildings" with whichever layer you want
-        # j = json.dumps(j["buildings"]) 
-
-        # use this jumps() command instead for the original feature collection with all the data
-        j = json.dumps(j);
-
-        with open('tiles/'+tilename, 'w') as fd:
-            fd.write(j.encode("UTF-8"))
-            fd.close()
-        count += 1
-        sys.stdout.write("\r%d%%" % (float(count)/float(total)*100.))
-        sys.stdout.flush()
-        
