@@ -31,6 +31,7 @@ from random import randint
 from Polygon import *
 from Polygon.IO import *
 import multiprocessing as mp
+from multiprocessing import Pool
 
 ## location of .json files to process -
 ## eg: path = "tiles" will look inside ./tiles/
@@ -105,15 +106,8 @@ def printStatus(string):
     stdout.write("\r"+string)
     stdout.flush()
 
-def tryprocessTile(t, output):
-    try:
-        print 'trying'
-        processTile(t, output)
-    except:
-        print('%s: %s' % (filename, traceback.format_exc()))
-
-def processTile(t, output):
-    print t
+# def processTile(t, output):
+def processTile(t):
     t.parsed = json.loads(t.data)
     # for each building
     buildings = t.parsed["buildings"]["features"]
@@ -146,55 +140,8 @@ def processTile(t, output):
         poly.tile = t
         t.polys.append(poly)
 
-    print "done"
-    output.put(t.parsed)
-    # output.put(t.polys)
+    return t
 
-def processTiles(i, t, output):
-# def processTile(i, t):
-
-# naming conventions for clarity:
-# "jpoly" is a polygon defined in json - "poly" is a Polygon() object
-# "jcontour" is a contour of a jpoly - "contour", that of a poly
-
-    print i
-    t.parsed = json.loads(t.data)
-
-    # for each building
-    buildings = t.parsed["buildings"]["features"]
-    for b in buildings:
-        # buildingcount += 1
-        # make a list of all the contours in the jpoly
-        contours = b["geometry"]["coordinates"]
-        
-        # new Polygon object
-        poly = Polygon()
-        poly.id = b["id"]
-
-        # for each contour in the jpoly
-        for c in contours:
-            # remove last redundant coordinate from each contour
-            del c[-1]
-
-            # for each vertex
-            # for v in c:
-                # offset all verts in tile to arrange in scenespace
-                # this isn't necessary when the data is coming straight from the json,
-                # only when the data is coming from a tangram vbo
-                # v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
-
-            poly.addContour(c)
-
-            # update tile's bbox with contour's bbox
-            t.bbox = updateBbox(t.bbox, list(poly.boundingBox()))
-
-        poly.tile = t
-        t.polys.append(poly)
-    print i
-
-    output.put(t)
-    # percent = abs(round(( i / len(tiles) * 100), 0))
-    # printStatus("%d%%"%percent)
 
 
 if __name__ == '__main__':
@@ -245,49 +192,15 @@ if __name__ == '__main__':
     ## convert json polys to Polygon() objects
     ##
 
+    p = mp.Pool()
 
 
-### multiprocessing first try
-
-    processes = [mp.Process(target=processTile, args=(t, output)) for t in tiles]
-
-    # Run processes
-    for p in processes:
-        print "start"
-        p.start()
-
-    # Exit the completed processes
-    for p in processes:
-        print "join"
-        p.join()
-
-    for j in processes:
-        # res_lst.append(output.get())
-        print output.get()
-
-
-# ### second try
-#     p = mp.Pool()
-
-#     for i, t in enumerate(tiles):
-#         new = p.apply_async(processTile, [i, t]) 
-#         print new.get()
-#         # t.parsed = new.parsed
-#         # t.polys = new.polys
-
-#     p.close()
-#     p.join()
-
-
-    
-    sys.exit()
+    tiles = p.map(processTile, tiles)
+    print tiles[0].polys[0]
+    print tiles[0].polys[0].id
 
     printStatus("100%")
-    # print tiles[0].parsed
 
-    res_lst = []
-    for j in range(len(p)):
-        print "out:", output.get()
 
     # make a list of all polys
     # this list comprehension is the same as the nested for loops below
@@ -330,7 +243,6 @@ if __name__ == '__main__':
             # progress percentage indicator
             percent = abs(round(((len(grouped))/len(polys) * 100), 0))
             printStatus("%d%%"%percent)
-            
             # if this is a copy of one we've already seen:
             if p.id in grouped:
                 # it is redundant, mark it for removal
@@ -522,7 +434,8 @@ if __name__ == '__main__':
             writeSVG(path+'/'+'%s.svg'%t.filename, t.polys, height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
 
     # write one big svg
-    writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
+    if len(allpolys) > 0:
+        writeSVG(path+'/'+'allpolys.svg', allpolys, height=2000, stroke_width=(2, 2), stroke_color=strokecolor, fill_opacity=((0),), )
 
     printStatus("100%")
 
