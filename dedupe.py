@@ -37,7 +37,7 @@ from multiprocessing import Pool
 ## eg: path = "tiles" will look inside ./tiles/
 
 # path=sys.argv[1] # future
-path = "manhattan/tiles1"
+path = "tiles2"
 
 # Define an output queue
 output = mp.Queue()
@@ -60,6 +60,8 @@ class Tile:
         self.bbox = [inf,inf,-inf,-inf]
         self.polys = []
 
+class Poly:
+    pass
 
 def xtolong(x, z):
     return x / pow(2.0, z) * 360.0 - 180
@@ -108,7 +110,13 @@ def printStatus(string):
 
 # def processTile(t, output):
 def processTile(t):
+    t.wenk = "wenk"
+    t.obj = Tester()
+    t.obj.wenk = "ewnk?"
+    t.obj.subobj = Subtester()
+    t.obj.subobj.wenk = "wenk!"
     t.parsed = json.loads(t.data)
+    t.blobs = []
     # for each building
     buildings = t.parsed["buildings"]["features"]
     for b in buildings:
@@ -117,8 +125,10 @@ def processTile(t):
         contours = b["geometry"]["coordinates"]
        
         # new Polygon object
-        poly = Polygon()
+        poly = Poly()
+        poly.p = Polygon()
         poly.id = b["id"]
+        poly.wenk = "wenk"
 
         # for each contour in the jpoly
         for c in contours:
@@ -132,10 +142,10 @@ def processTile(t):
                 # only when the data is coming from a tangram vbo
                 # v = [v[0]+(4096*(tilemax[0]-tile.x)), v[1]+(4096*(tilemax[1]-tile.y))]
 
-            poly.addContour(c)
+            poly.p.addContour(c)
 
             # update tile's bbox with contour's bbox
-            t.bbox = updateBbox(t.bbox, list(poly.boundingBox()))
+            t.bbox = updateBbox(t.bbox, list(poly.p.boundingBox()))
 
         poly.tile = t
         t.polys.append(poly)
@@ -143,6 +153,17 @@ def processTile(t):
     return t
 
 
+
+def testing(o):
+
+    o.id = "wenk"
+    return o
+
+class Tester:
+    pass
+
+class Subtester:
+    pass
 
 if __name__ == '__main__':
 
@@ -194,10 +215,7 @@ if __name__ == '__main__':
 
     p = mp.Pool()
 
-
     tiles = p.map(processTile, tiles)
-    print tiles[0].polys[0]
-    print tiles[0].polys[0].id
 
     printStatus("100%")
 
@@ -262,7 +280,7 @@ if __name__ == '__main__':
             for k, g in enumerate(groups):
                 for poly in g:
                     # if p.id != poly.id and p.overlaps(poly):
-                    if p.id != poly.id and overlapsEnough(p, poly):
+                    if p.id != poly.id and overlapsEnough(p.p, poly.p):
                         groupsToJoin.add(k)
 
             groupsToJoin = list(groupsToJoin)
@@ -288,7 +306,7 @@ if __name__ == '__main__':
                         # skip to next q poly
                         continue
                     # if p overlaps q significantly:
-                    if overlapsEnough(p, q):
+                    if overlapsEnough(p.p, q.p):
                         good = True
                         # if q is already in the group, mark it for removal
                         for x in group:
@@ -344,11 +362,11 @@ if __name__ == '__main__':
         printStatus("%d%%"%percent)
 
         # sort all polys in group by area
-        g.sort(key=lambda p: p.area)
+        g.sort(key=lambda p: p.p.area)
         # assume poly with largest area is the outermost polygon
         outer = g[0]
         # find "home" tile in which the outer's centroid lies
-        c = centroid(outer)
+        c = centroid(outer.p)
         home = None
         for i, t in enumerate(tiles):
             if t.bounds.isInside(c[0], c[1]):
@@ -423,15 +441,15 @@ if __name__ == '__main__':
         # add a color entry for the tile bounds rectangle
         strokecolor += color
 
-        for p in t.polys:
+        for poly in t.polys:
             # add the poly to the poly list
-            allpolys.append(p)
+            allpolys.append(poly.p)
             # add a corresponding color entry to the colors list
             strokecolor += color
 
         # write one svg per tile:
         if len(t.polys) > 0:
-            writeSVG(path+'/'+'%s.svg'%t.filename, t.polys, height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
+            writeSVG(path+'/'+'%s.svg'%t.filename, [poly.p for poly in t.polys], height=800, stroke_width=(1, 1), stroke_color=color, fill_opacity=((0),), )
 
     # write one big svg
     if len(allpolys) > 0:
