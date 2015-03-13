@@ -37,7 +37,7 @@ from multiprocessing import Pool
 ## eg: path = "tiles" will look inside ./tiles/
 
 # path=sys.argv[1] # future
-path = "tiles2"
+path = "manhattan/tiles"
 
 # Define an output queue
 output = mp.Queue()
@@ -110,13 +110,7 @@ def printStatus(string):
 
 # def processTile(t, output):
 def processTile(t):
-    t.wenk = "wenk"
-    t.obj = Tester()
-    t.obj.wenk = "ewnk?"
-    t.obj.subobj = Subtester()
-    t.obj.subobj.wenk = "wenk!"
     t.parsed = json.loads(t.data)
-    t.blobs = []
     # for each building
     buildings = t.parsed["buildings"]["features"]
     for b in buildings:
@@ -128,7 +122,6 @@ def processTile(t):
         poly = Poly()
         poly.p = Polygon()
         poly.id = b["id"]
-        poly.wenk = "wenk"
 
         # for each contour in the jpoly
         for c in contours:
@@ -152,26 +145,9 @@ def processTile(t):
 
     return t
 
-
-
-def testing(o):
-
-    o.id = "wenk"
-    return o
-
-class Tester:
-    pass
-
-class Subtester:
-    pass
-
 if __name__ == '__main__':
 
-    # # Define an output queue
-    # output = mp.Queue()
-
     start_time = time.time()
-
 
     ##
     ## import files and assign to Tile objects
@@ -213,13 +189,15 @@ if __name__ == '__main__':
     ## convert json polys to Polygon() objects
     ##
 
-    p = mp.Pool()
+    pool = mp.Pool()
 
-    tiles = p.map(processTile, tiles)
+    newtiles = pool.map(processTile, tiles)
+    pool.close()
+    pool.join()
 
     printStatus("100%")
 
-
+    tiles = newtiles
     # make a list of all polys
     # this list comprehension is the same as the nested for loops below
     # neat, eh?
