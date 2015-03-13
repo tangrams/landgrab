@@ -1,0 +1,118 @@
+2014-07-24
+- version 2.0.7
+- fixed some methods to work with instances of subclasses
+- fixed a bug in the SVG export (rgb), thanks to Diederik van Lierop
+- fixed a bug with exceptions in the initialisation, thanks to Diederik van Lierop
+- fixed a bug in gpc: replace on DBL_EPSILON with variable GPC_EPSILON, thanks to Peter Vavaroutsos
+- code changes to work with future versions of numpy (#define NPY_NO_DEPRECATED_API NPY_1_8_API_VERSION)
+
+2013-01-29
+- version 2.0.6
+- moved development from GitHub to bitbucket
+- renamed package from Polygon to Polygon2 to avoid conflicts with Polygon3
+- getting numpy include path automatically in setup.py
+- fixed https://github.com/jraedler/Polygon2/issues/2
+
+2012-07-03
+- version 2.0.5
+- changed some data types to prevent warnings
+- fixed numpy interface
+- numpy support is switched on by default now
+- close file correctly in gpfInfo()
+
+2011-03-20
+- version 2.0.4
+- fixed a bug in writeSVG()
+- added optional hole-flag for gpf files to the documentation
+- added Utils.gpfInfo()
+
+2010-09-29
+- fixed centerAroundOrigin()
+- updated documentation, merged with the 3.0.x branch
+- included PDF documentation in the dist packages
+
+2010-09-20
+- version 2.0.3
+
+17.09.10
+- added the tileBSP() function and an example
+
+2010-05-07
+- version 2.0.2
+- changed calculation of orientation to another (better) algorithm
+  (thanks to Jan Nabbefeld)
+- added a patch to get sample points from the polygon
+  (thanks to Thouis (Ray) Jones)
+- several changes to fix potential memory leaks
+  (thanks to Daniel Derrien and others)
+
+2009-09-14
+- version 2.0.1
+- bugfix for calculation of orientation and center
+
+2009-06-02
+- fork of the 3.0 branch to work with python-3.x
+
+2009-06-02
+- version 2.0 final
+- added SierpinskiCarpet to Shapes
+- deleted an old print statement in pdf export
+
+2009-03-09
+- version 2.0b2
+- updated documentation
+- works now with latest numpy
+- some bugfixes
+
+2009-02-15
+- version 2.0b1
+- lots of changes, most important are:
+    * Polygons can now be subclassed
+    * added a cloneContour method 
+    * moved modules to a package
+    * moved i/o and shapes to separate modules
+    * moved from numeric to numpy
+    * dropped some old stuff, requires a recent python interpreter now (>=2.5)
+- open bugs:
+    * numpy-test doesn't work yet
+
+2007-04-19
+- version 1.17
+- bugfix for Python 2.5 / PyMalloc (mixed PyMem_* and PyObject_*)
+
+2006-04-19
+- version 1.16
+- small change to work with Python 2.2 again (thanks to Tim Wegener),
+  unittest will not work with 2.2
+
+2005-08-12
+- version 1.15
+- fixed one bug introduced in 1.14
+
+2005-08-11
+- version 1.14
+- fixed a memory leak when not using Numeric (hopefully)
+
+2005-01-25
+- version 1.13
+- added dump/loadXML()
+- added dump/loadBinary()
+
+2004-12-21
+- version 1.12
+- switched to gpc 2.32
+
+2004-10-26
+- catched errors while opening files for reading or writing
+
+2004-10-18
+- added some tests
+
+2004-10-12
+- version 1.10
+- started the HISTORY file
+- improved SVG export a lot
+- added support for unittest
+- moved some tests from examples to PolygonTest.py
+- collected and improved other examples -> PolygonExamples.py
+- all examples now produce SVG instead of gnuplot files
