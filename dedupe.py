@@ -35,7 +35,7 @@ from Polygon.IO import *
 ## eg: path = "tiles" will look inside ./tiles/
 
 # path=sys.argv[1] # future
-path = "manhattan/tiles"
+path = "manhattan/tiles16"
 
 
 
