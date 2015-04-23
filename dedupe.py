@@ -170,7 +170,9 @@ for i, t in enumerate(tiles):
         # for each contour in the jpoly
         for c in contours:
             # remove last redundant coordinate from each contour
-            del c[-1]
+            # (Tangram doesn't like this - it needs the last coordinate
+                # to draw the last face properly)
+            # del c[-1]
 
             # for each vertex
             # for v in c:
@@ -192,7 +194,7 @@ printStatus("100%")
 
 # make a list of all polys
 # this list comprehension is the same as the nested for loops below
-# neat, eh?
+# neat, eh? ...but harder to read :/
 # polys = [p for t in tiles for p in t.polys]
 
 polys = []
