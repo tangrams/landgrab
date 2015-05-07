@@ -233,7 +233,6 @@ def getTiles(_points,_zoom):
 ## PROCESSING points
 ##
 
-## find boundingbox of latlongs
 print "Processing:"
 
 points = []
