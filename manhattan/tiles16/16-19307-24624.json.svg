@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" width="297" height="800">
+<path style="fill:rgb(255, 0, 0);fill-opacity:0;fill-rule:evenodd;stroke:rgb(0, 255, 71);stroke-width:1;" d="M 104.642, 73.1095 L 157.898, 0 L 184.058, 10.9781 L 195.737, 15.8832 L 203.679, 4.90511 L 206.949, 6.30657 L 225.869, 53.0219 L 204.38, 82.4526 L 242.219, 98.3358 L 166.307, 202.511 L 164.438, 202.511 L 156.496, 185.693 L 156.263, 185.693 L 144.818, 161.168 L 142.248, 161.635 L 121.226, 116.321 L 123.796, 115.62 L 111.883, 90.3942 L 112.818, 90.1606 L 104.642, 73.1095 z "/>
+<path style="fill:rgb(0, 255, 0);fill-opacity:0;fill-rule:evenodd;stroke:rgb(0, 255, 71);stroke-width:1;" d="M 204.146, 779.212 L 235.679, 769.635 L 226.336, 751.883 L 265.577, 739.971 L 253.431, 697.226 L 248.526, 697.226 L 247.825, 692.788 L 265.343, 691.62 L 267.212, 682.511 L 294.54, 685.08 L 292.438, 698.161 L 265.109, 695.358 L 262.307, 696.292 L 275.153, 738.803 L 297.577, 785.752 L 250.628, 800 L 238.015, 776.175 L 207.416, 785.518 L 204.146, 779.212 z "/>
+<path style="fill:rgb(0, 0, 255);fill-opacity:0;fill-rule:evenodd;stroke:rgb(0, 255, 71);stroke-width:1;" d="M 0, 309.022 L 27.562, 271.416 L 96, 300.38 L 68.438, 337.985 L 0, 309.022 z "/>
+<path style="fill:rgb(255, 255, 0);fill-opacity:0;fill-rule:evenodd;stroke:rgb(0, 255, 71);stroke-width:1;" d="M 35.7372, 259.737 L 42.5109, 250.394 L 71.4745, 262.774 L 64.4672, 271.883 L 35.7372, 259.737 z "/>
+</svg>
