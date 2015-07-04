@@ -35,7 +35,7 @@ from Polygon.IO import *
 ## eg: path = "tiles" will look inside ./tiles/
 
 # path=sys.argv[1] # future
-path = "manhattan/tiles"
+path = "tiles"
 
 
 
@@ -165,7 +165,7 @@ for i, t in enumerate(tiles):
         
         # new Polygon object
         poly = Polygon()
-        poly.id = b["id"]
+        poly.id = b["properties"]["id"]
 
         # for each contour in the jpoly
         for c in contours:
@@ -357,7 +357,7 @@ for i, g in enumerate(groups):
             home.polys.append(p)
             # find the associated source json, using the poly's .tile attribute
             for i, f in enumerate(p.tile.parsed["buildings"]["features"]):
-                if f["id"] == p.id:
+                if f["properties"]["id"] == p.id:
                     # copy it over too
                     home.parsed["buildings"]["features"].append(f)
 
@@ -369,7 +369,7 @@ for i, g in enumerate(groups):
                     t.polys.remove(p)
                 # find and remove the json
                 for f in t.parsed["buildings"]["features"]:
-                    if f["id"] == p.id:
+                    if f["properties"]["id"] == p.id:
                         t.parsed["buildings"]["features"].remove(f)
 
 printStatus("100%")
