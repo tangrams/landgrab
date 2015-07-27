@@ -4,6 +4,10 @@ import requests, json, math, sys, os
 import xml.etree.ElementTree as ET
 import pprint
 
+if len(sys.argv) < 3:
+    print "At least 2 arguments needed - please enter an OSM ID and zoom level."
+    sys.exit()
+
 OSMID=sys.argv[1]
 
 if isinstance(sys.argv[2], basestring):
@@ -211,7 +215,7 @@ def getTiles(_points,_zoom):
         sys.stdout.flush()
         for tile in tiles:
             tilename = "%i-%i-%i.json" % (_zoom,tile['x'],tile['y'])
-            r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json" % (_zoom, tile['x'],tile['y']))
+            r = requests.get("http://vector.mapzen.com/osm/all/%i/%i/%i.json?api_key=vector-tiles-HqUVidw" % (_zoom, tile['x'],tile['y']))
             j = json.loads(r.text)
 
             # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
