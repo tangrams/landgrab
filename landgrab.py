@@ -1,4 +1,6 @@
 # todo: handle cases where the boundary crosses the dateline
+# usage:
+# python landgrab.py [osm id] [zoom level] [optional list-only flag]
 
 import requests, json, math, sys, os
 import xml.etree.ElementTree as ET
