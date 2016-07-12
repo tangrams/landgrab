@@ -139,8 +139,8 @@ function parseFile(res) {
     console.log(response)
 
     xmlroot = response.documentElement;
-    console.log('xmlroot:', xmlroot)
-    console.log('xmlroot children:', xmlroot.children)
+    // console.log('xmlroot:', xmlroot)
+    // console.log('xmlroot children:', xmlroot.children)
     // console.log('xmlroot[0]:', xmlroot)
 
 	//
@@ -156,11 +156,11 @@ function parseFile(res) {
 	    if (node.tagName == "node") {
 	        lat = parseFloat(node.getAttribute("lat"));
 	        lon = parseFloat(node.getAttribute("lon"));
-	        console.log('lat:', lat, 'lon:', lon)
+	        // console.log('lat:', lat, 'lon:', lon)
 	        points.push({'y':lat, 'x':lon});
 	    }
 	}
-	console.log('points:', points);
+	// console.log('points:', points);
 
 	//
 	// GET TILES for all zoom levels
@@ -170,30 +170,35 @@ function parseFile(res) {
 	}
 
 }
-
+var tileslist = []
 function getTiles(points,zoom) {
-	var tiles = [];
+	var tilesset = new Set();
 
     for (p in points) {
     	point = points[p];
-        tiles.push(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom))
+        newtile = tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom);
+        newtile = JSON.stringify(newtile);
+        tilesset.add(newtile);
     }
 
-var r = Array.from(new Set(tiles))
-    // tiles = dedupe(tiles);
-    // tiles = tiles.filter(function (v, i, a) { return a.indexOf (v) == i }); // dedupe array
 
-	
-	    // var o = {}, i, l = tiles.length, r = [];
-	    // for(i=0; i<l;i+=1) o[tiles[i]] = tiles[i];
-	    // for(i in o) r.push(o[i]);
+// var arr = {};
 
-console.log('r?', JSON.stringify(r));
-    console.log('length:', r.length);
+// for ( var i=0, len=things.thing.length; i < len; i++ )
+//     arr[things.thing[i]['place']] = things.thing[i];
 
+// things.thing = new Array();
+// for ( var key in arr )
+//     things.thing.push(arr[key]);
 
-    // console.log('tiles:', JSON.stringify(tiles));
-    // console.log('length:', tiles.length);
+    // console.log('tilesset:', tilesset);
+    // console.log('length:', tilesset.size);
+    tiles = [];
+    tilesset.forEach(function (t) {
+        tiles.push(JSON.parse(t));
+        });
+    console.log('tiles:', tiles);
+    console.log('length:', tiles.length);
 
 }
 // landgrab(209879879874648, "0-3, 1, 12", 1)
