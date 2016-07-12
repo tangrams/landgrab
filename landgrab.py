@@ -10,20 +10,19 @@ if len(sys.argv) < 3:
     print "At least 2 arguments needed - please enter an OSM ID and zoom level."
     sys.exit()
 
+# get the OpenStreetMap ID
 OSMID=sys.argv[1]
 
-if isinstance(sys.argv[2], basestring):
-    zoom=[]
-    for part in sys.argv[2].split(','):
-        if '-' in part:
-            a, b = part.split('-')
-            a, b = int(a), int(b)
-            zoom.extend(range(a, b + 1))
-        else:
-            a = int(part)
-            zoom.append(a)
-else:
-    zoom=[int(sys.argv[2])]
+zoom=[]
+# handle multi-part ranges, eg "3-4, 5, 6-7"
+for part in sys.argv[2].split(','):
+    if '-' in part:
+        a, b = part.split('-')
+        a, b = int(a), int(b)
+        zoom.extend(range(a, b + 1))
+    else:
+        a = int(part)
+        zoom.append(a)
 
 coordsonly=0
 if len(sys.argv) > 3:
@@ -122,7 +121,7 @@ def metersForTile(tile):
 def getTiles(_points,_zoom):
     tiles = []
 
-    ## find tile
+    ## find the tile which contains each point
     for point in _points:
         tiles.append(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), _zoom))
 
@@ -132,12 +131,12 @@ def getTiles(_points,_zoom):
     ## patch holes in tileset
 
     ## get min and max tiles for lat and long
-
-    minx = 1048577
+    # set min vals to maximum tile #s + 1 at zoom 21
+    minx = 2097152
     maxx = -1
-    miny = 1048577
+    miny = 2097152
     maxy = -1
-
+    print "tiles:"+str(tiles)
     for tile in tiles:
         minx = min(minx, tile['x'])
         maxx = max(maxx, tile['x'])
@@ -149,11 +148,13 @@ def getTiles(_points,_zoom):
 
     for tile in tiles:
         # find furthest tiles from this tile on x and y axes
+        # todo: check across the dateline, maybe with some kind of mod(360) -
+        # if a closer value is found, use that instead and warp across the antimeridian
         x = tile['x']
-        lessx = 1048577
+        lessx = 2097152
         morex = -1
         y = tile['y']
-        lessy = 1048577
+        lessy = 2097152
         morey = -1
         for t in tiles:
             if int(t['x']) == int(tile['x']):
@@ -190,7 +191,7 @@ def getTiles(_points,_zoom):
     if coordsonly == 1:
         ## output coords
         pprint.pprint(tiles)
-        print "\nFinished: %i tiles at zoom level %i" % (len(tiles), _zoom)
+        print "\nFinished: %i tiles at zoom level %i\n" % (len(tiles), _zoom)
     else:
         ## download tiles
         print "\nDownloading %i tiles at zoom level %i" % (len(tiles), _zoom)
