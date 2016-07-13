@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+    Tangram: real-time WebGL rendering for OpenStreetMap
+
+    http://github.com/tangrams/tangram
+    http://mapzen.com
+-->
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vector map</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.0-beta.2/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0px;
+            border: 0px;
+            padding: 0px;
+        }
+
+        #map {
+            background: rgba(0, 0, 0, 0);
+        }
+    </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+
+    <!-- 3rd party libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.0.0-beta.2/leaflet.js"></script>
+    <!-- bog-standard leaflet URL hash -->
+    <script src="lib/leaflet-hash.js"></script>
+    <!-- zip files -->
+    <!-- // <script type="text/javascript" src="lib/jszip.min.js"></script> -->
+    <script type="text/javascript" src="lib/zip.js"></script>
+    <!-- script for exporting vbos -->
+    <script type="text/javascript" src="lib/batch_export.js"></script>
+    <!-- FileSaver.js implements the HTML5 W3C saveAs() -->
+    <script type="text/javascript" src="lib/FileSaver.js"></script>
+    <!-- End of 3rd party libraries -->
+
+    <!-- Main tangram library -->
+    <!-- <script src="https://mapzen.com/tangram/0.1/tangram.min.js"></script> -->
+    <!-- custom build with 'retain = true' -->
+    <script src="lib/tangram.min.js"></script>
+
+    <!-- landgrab -->
+    <script src="landgrab.js"></script>
+    <!-- Demo module -->
+    <script src="main.js"></script>
+
+    <!-- Adding a script block to post message to the parent container (think iframed demos) -->
+    <script type="text/javascript">
+      window.addEventListener("hashchange",function(){parent.postMessage(window.location.hash, "*")});
+    </script>
+  </body>
+</html>
