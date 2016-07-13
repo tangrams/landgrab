@@ -324,11 +324,14 @@ function exportVBOs(tiles) {
     vbosProcessed = 0;
 
     function waitForVerts(callback, coords, offset, name) {
+        // console.log('waiting for verts. callback:', callback)
       var coords = coords;
       var name = name;
       setTimeout(function () {
+        // console.log('coords:', coords)
+        // console.log('typeof scene.tile_manager.tiles[coords]:',typeof scene.tile_manager.tiles[coords]);
         // todo: determine which of these are necessary
-        // also todo: trigger this based on a loadCoordinates callback instead
+        // also todo: trigger this based on a loadCoordinate callback instead
         if (typeof scene.tile_manager.tiles[coords] != "undefined") {
           if ( scene.tile_manager.tiles[coords].loaded != false) {
             if ( Object.keys(scene.tile_manager.tiles[coords].meshes).length != 0) {
@@ -355,6 +358,7 @@ function exportVBOs(tiles) {
     }
 
     function waitForWorkers(callback) {
+        console.log('waiting for workers')
       setTimeout(function () {
         // check for workers
         if (typeof scene.workers != "undefined") {
@@ -362,6 +366,7 @@ function exportVBOs(tiles) {
           if (typeof scene.workers[scene.next_worker] != "undefined") {
             // check that the scene is instantiated and ready to go
             if (typeof scene.center_meters != "undefined") {
+            console.log('workers ready')
               callback();
               return;
             }
@@ -373,8 +378,10 @@ function exportVBOs(tiles) {
     }
 
     function waitForScene(callback) {
+        console.log('waiting for scene')
       setTimeout(function () {
         if (scene.initialized) {
+            console.log('scene ready to go')
             callback();
             return;
         }
@@ -384,7 +391,9 @@ function exportVBOs(tiles) {
     }
 
     function waitForVBOs(callback) {
+        console.log('waiting for vbos')
       setTimeout(function () {
+        // console.log('vbosProcessed:', vbosProcessed)
         if (vbosProcessed == mytiles.length) {
             callback();
             return;
@@ -396,7 +405,8 @@ function exportVBOs(tiles) {
 
     function loadTiles() {
       for (t in mytiles) {
-        // console.log("loading", mytiles[t]);
+        console.log("loading", mytiles[t]);
+        // todo: determine whether this is working
         scene.tile_manager.loadCoordinate(mytiles[t]);
       }
       console.log("%d tiles loaded", mytiles.length);
@@ -425,6 +435,7 @@ function exportVBOs(tiles) {
         offset.x *= 4096;
         offset.y *= 4096;
 
+        console.log('wait for verts!')
         // wait for tile to load, then process it
         waitForVerts(processVerts, coords, offset, name);
       }
@@ -436,6 +447,7 @@ function exportVBOs(tiles) {
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
     function processVerts(coords, offset, name) {
+      console.log('processverts!')
       console.log("Processing tile", vbosProcessed + 1, "of", mytiles.length, "-", (((vbosProcessed + 1)/mytiles.length)*100).toFixed(2), "%");
 
       meshes = scene.tile_manager.tiles[coords].meshes;
@@ -537,6 +549,6 @@ function exportVBOs(tiles) {
 // landgrab(209879879874648, "0-3, 1, 12", 1)
 // landgrab(204648, "0-3, 1, 12", 1)
 // landgrab(3954665, 16, 1)
-landgrab(3954665, 15)
+// landgrab(3954665, 15)
 
 
