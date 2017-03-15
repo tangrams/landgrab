@@ -4,7 +4,9 @@ sources:
         # url:  'tiles15/{z}-{x}-{y}.json'
         # url:  'deduped/{z}-{x}-{y}.json'
         type: TopoJSON
-        url:  https://tile.mapzen.com/mapzen/vector/v1/all/{z}/{x}/{y}.topojson?api_key=vector-tiles-HqUVidw
+        url:  https://tile.mapzen.com/mapzen/vector/v1/all/{z}/{x}/{y}.topojson
+        url_params:
+            api_key: vector-tiles-HqUVidw
 
 cameras:
     perspective:
