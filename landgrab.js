@@ -81,6 +81,10 @@ coordsonly = false;
 
 function landgrab(OSMID, zoomarg, listonly) {
 
+  if (zoomarg != scene.zoom) {
+    map.setZoom(zoomarg);
+  }
+
 	console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'listonly:', listonly);
 	if (arguments.length < 2) {
 	    console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
@@ -330,12 +334,19 @@ function exportVBOs(tiles) {
       setTimeout(function () {
         // console.log('coords:', coords)
         // console.log('typeof scene.tile_manager.tiles[coords]:',typeof scene.tile_manager.tiles[coords]);
+
+        // wait for tile to load
         // todo: determine which of these are necessary
         // also todo: trigger this based on a loadCoordinate callback instead
+
+        // coords should look like mapzen/16/19294/24642/16
         if (typeof scene.tile_manager.tiles[coords] != "undefined") {
+
           if ( scene.tile_manager.tiles[coords].loaded != false) {
             if ( Object.keys(scene.tile_manager.tiles[coords].meshes).length != 0) {
+
               // if (typeof scene.tile_manager.tiles[coords].meshes.polygons != "undefined" || typeof scene.tile_manager.tiles[coords].meshes.lines != "undefined") {
+
               //   if (typeof scene.tile_manager.tiles[coords].meshes.polygons.vertex_data != "undefined" || typeof scene.tile_manager.tiles[coords].meshes.lines.vertex_data != "undefined") {
               //       callback(coords, offset, name);
               //       return;
@@ -417,6 +428,7 @@ function exportVBOs(tiles) {
     }
 
     function processTiles() {
+      var zoom;
       for (t in mytiles) {
         mt = mytiles[t];
         if (Object.keys(scene.config.sources).length > 1) {
@@ -426,6 +438,7 @@ function exportVBOs(tiles) {
         source = Object.keys(scene.config.sources)
         coords = source+"/"+mt.z+"/"+mt.x+"/"+mt.y+"/"+mt.z;
         name = mt.x+"-"+mt.y+"-"+mt.z;
+        zoom = mt.z;
 
         // calculate offset relative to the extents of the tile batch -
         // the top-left tile is 0,0 - one tile over is 1,0 - one tile down is 0,1
@@ -441,8 +454,6 @@ function exportVBOs(tiles) {
       }
     }
 
-    // todo: get zoom from mytiles or scene
-    zoom = 16;
     maximum_range = 4096; // tile-space coordinate maximum
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
