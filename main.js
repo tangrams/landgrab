@@ -37,6 +37,7 @@
     window.layer = layer;
     var scene = layer.scene;
     window.scene = scene;
+    window.map = map;
 
     map.setView(map_start_location.slice(0, 2), map_start_location[2]);
 
