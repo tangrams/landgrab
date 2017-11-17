@@ -56,12 +56,12 @@
     window.addEventListener('load', function () {
         // Scene initialized
         layer.addTo(map);
-        // landgrab(209879879874648, "0-3, 1, 12", 1)
-        // landgrab(204648, "0-3, 1, 12", 1)
-        // landgrab(3954665, 16, 1)
+        // landgrab(209879879874648, "0-3, 1, 12", "list")
+        // landgrab(204648, "0-3, 1, 12", "list")
+        // landgrab(3954665, 16, "list")
         // landgrab(3954665, 15)
-        // landgrab(3954665, 16, 1)
-        landgrab(3954665, 14)
+        // landgrab(3954665, 16, "list")
+        landgrab(3954665, 14, 'vbo')
     });
 
 

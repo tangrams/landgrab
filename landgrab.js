@@ -1,6 +1,5 @@
 var tile_size = 256;
-var half_circumference_meters = 20037508.342789244;
-var xmlroot;
+const half_circumference_meters = 20037508.342789244;
 
 function range(start, end) {
     // console.log('range ', start, end)
@@ -11,30 +10,30 @@ function range(start, end) {
 }
 
 function dedupe(b) {
-  a = [];
-  b.forEach(function(value){
-    if (a.indexOf(value)==-1) a.push(value);
-  });
-  return a;
+    a = [];
+    b.forEach(function(value){
+        if (a.indexOf(value)==-1) a.push(value);
+    });
+    return a;
 }
 
 function getHttp (url, callback) {
-  var request = new XMLHttpRequest();
-  var method = 'GET';
+    var request = new XMLHttpRequest();
+    var method = 'GET';
 
-  request.onreadystatechange = function () {
-    if (request.readyState === 4 && request.status === 200) {
-      var response = request.responseText;
+    request.onreadystatechange = function () {
+        if (request.readyState === 4 && request.status === 200) {
+            var response = request.responseText;
 
-      var error = null;
-      callback(error, response);
-    } else if (request.readyState === 4 && request.status === 404) {
-      var error = 'nope';
-      callback(error, response);
-    }
-  };
-  request.open(method, url, true);
-  request.send();
+            var error = null;
+            callback(error, response);
+        } else if (request.readyState === 4 && request.status === 404) {
+            var error = 'nope';
+            callback(error, response);
+        }
+    };
+    request.open(method, url, true);
+    request.send();
 }
 
 // Convert lat-lng to mercator meters
@@ -77,22 +76,29 @@ function metersForTile(tile) {
     }
 }
 
-coordsonly = false;
+// grab land
+// expects an OpenStreetMap ID integer, a zoom argument string, and a format string
+// examples:
+// landgrab(209879879874648, "0-3, 1, 12", "list")
+// landgrab(204648, "0-3, 1, 12", "terrain")
+// landgrab(3954665, 16, "vector")
+// landgrab(3954665, 14) // default type is "list"
+function landgrab(OSMID, zoomarg, format = "list") {
 
-function landgrab(OSMID, zoomarg, listonly = false) {
+    if (zoomarg != scene.zoom) {
+        map.setZoom(zoomarg);
+    }
 
-  if (zoomarg != scene.zoom) {
-    map.setZoom(zoomarg);
-  }
-
-  console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'listonly:', listonly);
-  if (arguments.length < 2) {
-      console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
-      return false;
-  }
+    console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'format:', format);
+    if (arguments.length < 2) {
+        console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
+        return false;
+    }
 
     zoom = [];
     console.log('String(zoomarg).split(","):', String(zoomarg).split(','))
+    // parse zoom argument – accepts a comma-separated list and ranges in the form start-stop
+    // eg: "1,3,5-8"
     zoomarg = String(zoomarg).replace(/\s+/g, '');
     String(zoomarg).split(',').forEach(function(part) {
         if (part.indexOf('-') > -1) {
@@ -104,102 +110,94 @@ function landgrab(OSMID, zoomarg, listonly = false) {
             a = parseInt(part);
             zoom.push(a);
         }
-  });
-  zoom = dedupe(zoom);
+    });
+    zoom = dedupe(zoom);
 
-  // get points
-  getPoints(OSMID, function(response){
-
-    points = parseFile(response)
-
-    //
-    // GET TILES for all zoom levels
-    //
-
-    tiles = [];
-    for (z in zoom) {
-        tiles.push(getTiles(points, zoom[z]));
-    }
-
-    if (listonly) {
-        // output coords
-        console.log(JSON.stringify(tiles));
-        console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
-    } else {
-        // load tiles
-        console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
-        exportVBOs(tiles);
-        // pull in functionality from manhattan-project
-    }
+    // get points
+    getPoints(OSMID, function(response){
+        points = parseFile(response)
 
 
-  });
+        // GET TILES for all zoom levels
+        tiles = [];
+        for (z in zoom) {
+            tiles.push(getTiles(points, zoom[z]));
+        }
+
+        if (format === "list") {
+            // output coords
+            console.log(JSON.stringify(tiles));
+            console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
+        } else if (format === "vbo") {
+            // load tiles
+            console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
+            grabVBOs(tiles);
+            // pull in functionality from manhattan-project
+        } else if (format === "vector") {
+            grabVectorTiles(tiles);
+        } else if (format === "terrain") {
+            grabTerrainTiles(tiles);
+        }
+    });
 }
 
 function getPoints(OSMID, callback) {
-  // try to download the node's xml from OSM
-  // three possible element types: relation, way, and node
-  INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
-  console.log("Downloading relation:", INFILE);
-  getHttp(INFILE, function(err, res){
+    // try to download the node's xml from OSM
+    // three possible element types: relation, way, and node
+    INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
+    console.log("Downloading relation:", INFILE);
+    getHttp(INFILE, function(err, res){
     if (err) {
-      console.error('no relation:', err);
-      INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full';
-      console.log("Downloading way:", INFILE);
-      getHttp(INFILE, function(err, res){
+        console.error('no relation:', err);
+        INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full';
+        console.log("Downloading way:", INFILE);
+        getHttp(INFILE, function(err, res){
         if (err) {
-          console.error('no way:', err);
+            console.error('no way:', err);
 
-          INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID;
-          console.log("Downloading node:", INFILE);
-          getHttp(INFILE, function(err, res){
+            INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID;
+            console.log("Downloading node:", INFILE);
+            getHttp(INFILE, function(err, res){
             if (err) {
                 console.error('no node:', err);
             } else {
-              console.log('node received')
-              callback(res);
+                console.log('node received')
+                callback(res);
             }
-          });
+            });
         } else {
-          console.log('way received')
-          callback(res);
+            console.log('way received')
+            callback(res);
         }
-      });
+        });
     } else {
-      console.log('relation received')
-      callback(res);
+        console.log('relation received')
+        callback(res);
     }
-  });
+    });
 }
 
-function parseFile(res) { 
-  parser = new DOMParser();
-  response = parser.parseFromString(res, "text/xml");
+// parse an XML response from the OSM API and extract latlon points
+// which make up the outline of the object
+function parseFile(res) {
+    parser = new DOMParser();
+    response = parser.parseFromString(res, "text/xml");
+    // console.log('xml:', response)
 
-  console.log('xml:', response)
+    var xmlroot = response.documentElement;
 
-  xmlroot = response.documentElement;
-
-  //
-  // PROCESSING points
-  //
-
-  console.log("Processing:")
-  // var response = JSON.parse(res);
-
-  points = [];
-  for (n in xmlroot.children) {
-    node = xmlroot.children[n];
-    if (node.tagName == "node") {
-      lat = parseFloat(node.getAttribute("lat"));
-      lon = parseFloat(node.getAttribute("lon"));
-      // console.log('lat:', lat, 'lon:', lon)
-      points.push({'y':lat, 'x':lon});
+    // extract points from XML response
+    points = [];
+    for (n in xmlroot.children) {
+        node = xmlroot.children[n];
+        if (node.tagName == "node") {
+            lat = parseFloat(node.getAttribute("lat"));
+            lon = parseFloat(node.getAttribute("lon"));
+            points.push({'y':lat, 'x':lon});
+        }
     }
-  }
-  // console.log('points:', points);
 
-  return points;
+    return points;
 }
 
 function dedupeArray(a) {
@@ -213,11 +211,10 @@ function dedupeArray(a) {
     });
     return newarray;
 }
-var tileslist = []
 
 function getTiles(points,zoom) {
-  tiles = [];
-  var tilesset = new Set();
+    tiles = [];
+    var tilesset = new Set();
     for (p in points) {
       point = points[p];
         tile = JSON.stringify(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom));
@@ -227,7 +224,7 @@ function getTiles(points,zoom) {
     tilesset.forEach(function (t) {
         tiles.push(JSON.parse(t));
     });
-    console.log('number of tiles:', tiles.length);
+    // console.log('number of tiles:', tiles.length);
 
     // patch holes in tileset
 
@@ -317,28 +314,32 @@ function getTiles(points,zoom) {
     return tiles;
 }
 
-
-
-function exportVBOs(tiles) {
-
-    console.log("Beginning VBO export");
-
-    var mytiles = tiles;
-
-    var num = mytiles.length;
-    console.log("Loading", num, "tiles");
-
-    // find tile range, for offset calculation
-    min = {x: Infinity, y: Infinity};
-    max = {x:-Infinity, y: -Infinity};
-    for (t in mytiles) {
-      mt = mytiles[t];
+function findTileRange(tiles) {
+    var min = {x: Infinity, y: Infinity};
+    var max = {x:-Infinity, y: -Infinity};
+    for (t in tiles) {
+      mt = tiles[t];
 
       min.x = Math.min(min.x, mt.x);
       min.y = Math.min(min.y, mt.y);
       max.x = Math.max(max.x, mt.x);
       max.y = Math.max(max.y, mt.y);
     }
+    return [min, max];
+}
+
+// export VBOs from Tangram
+function grabVBOs(tiles) {
+
+    console.log("Beginning VBO export");
+
+    var mytiles = tiles;
+
+    var num = mytiles.length;
+    // console.log("Loading", num, "tiles");
+
+    // find tile range, for offset calculation
+    var [min, max] = findTileRange(mytiles);
 
     // prepare a list of vbos
     vbos = [];
@@ -348,6 +349,7 @@ function exportVBOs(tiles) {
         // console.log('waiting for verts. callback:', callback)
       var coords = coords;
       var name = name;
+      // have to use a timeout because there's no callback in Tangram for this
       setTimeout(function () {
         // console.log('coords:', coords)
         // console.log('typeof scene.tile_manager.tiles[coords]:',typeof scene.tile_manager.tiles[coords]);
@@ -433,7 +435,8 @@ function exportVBOs(tiles) {
 
     function loadTiles() {
       for (t in mytiles) {
-        console.log("loading", mytiles[t]);
+        document.title = t+" of "+mytiles.length+" loaded - "+(((parseInt(t) + 1)/mytiles.length)*100).toFixed(2)+ "%";
+
         // todo: determine whether this is working
         scene.tile_manager.loadCoordinate(mytiles[t]);
       }
@@ -465,7 +468,7 @@ function exportVBOs(tiles) {
         offset.x *= 4096;
         offset.y *= 4096;
 
-        console.log('wait for verts!')
+        // console.log('wait for verts!')
         // wait for tile to load, then process it
         waitForVerts(processVerts, coords, offset, name);
       }
@@ -475,7 +478,7 @@ function exportVBOs(tiles) {
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
     function processVerts(coords, offset, name) {
-      console.log("Processing tile", vbosProcessed + 1, "of", mytiles.length, "-", (((vbosProcessed + 1)/mytiles.length)*100).toFixed(2), "%");
+      document.title = (vbosProcessed + 1)+" of "+mytiles.length+" processed - "+(((vbosProcessed + 1)/mytiles.length)*100).toFixed(2)+ "%";
 
       meshes = scene.tile_manager.tiles[coords].meshes;
       allverts = "";
@@ -559,12 +562,13 @@ function exportVBOs(tiles) {
             // save with FileSaver.js
             saveAs(blob, "example.zip");
             console.log("Done!");
-            });
+            document.title = oldTitle;
+          });
         }
         nextFile(f);
       }, onerror);
     }
-
+    window.oldTitle = document.title;
     waitForWorkers(loadTiles);
 
     waitForScene(processTiles);
@@ -572,6 +576,4 @@ function exportVBOs(tiles) {
     waitForVBOs(zipBlobs);
 
 }
-
-
 
