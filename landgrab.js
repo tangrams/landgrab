@@ -11,30 +11,30 @@ function range(start, end) {
 }
 
 function dedupe(b) {
-	a = [];
-	b.forEach(function(value){
-	  if (a.indexOf(value)==-1) a.push(value);
-	});
-	return a;
+  a = [];
+  b.forEach(function(value){
+    if (a.indexOf(value)==-1) a.push(value);
+  });
+  return a;
 }
 
 function getHttp (url, callback) {
-    var request = new XMLHttpRequest();
-    var method = 'GET';
+  var request = new XMLHttpRequest();
+  var method = 'GET';
 
-    request.onreadystatechange = function () {
-        if (request.readyState === 4 && request.status === 200) {
-            var response = request.responseText;
+  request.onreadystatechange = function () {
+    if (request.readyState === 4 && request.status === 200) {
+      var response = request.responseText;
 
-            var error = null;
-            callback(error, response);
-        } else if (request.readyState === 4 && request.status === 404) {
-            var error = 'nope';
-            callback(error, response);
-        }
-    };
-    request.open(method, url, true);
-    request.send();
+      var error = null;
+      callback(error, response);
+    } else if (request.readyState === 4 && request.status === 404) {
+      var error = 'nope';
+      callback(error, response);
+    }
+  };
+  request.open(method, url, true);
+  request.send();
 }
 
 // Convert lat-lng to mercator meters
@@ -79,19 +79,18 @@ function metersForTile(tile) {
 
 coordsonly = false;
 
-function landgrab(OSMID, zoomarg, listonly) {
+function landgrab(OSMID, zoomarg, listonly = false) {
 
   if (zoomarg != scene.zoom) {
     map.setZoom(zoomarg);
   }
 
-	console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'listonly:', listonly);
-	if (arguments.length < 2) {
-	    console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
-	    return false;
-	}
+  console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'listonly:', listonly);
+  if (arguments.length < 2) {
+      console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
+      return false;
+  }
 
-    if (listonly) coordsonly = true;
     zoom = [];
     console.log('String(zoomarg).split(","):', String(zoomarg).split(','))
     zoomarg = String(zoomarg).replace(/\s+/g, '');
@@ -105,75 +104,102 @@ function landgrab(OSMID, zoomarg, listonly) {
             a = parseInt(part);
             zoom.push(a);
         }
-	});
-	zoom = dedupe(zoom);
+  });
+  zoom = dedupe(zoom);
 
-	// try to download the node's xml from OSM
-	// this is ugly
-    INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
-    console.log("Downloading", INFILE);
-    getHttp(INFILE, function(err, res){
-        if (err) {
-	        INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full'
-		    console.log("Downloading", INFILE);
-		    getHttp(INFILE, function(err, res){
-		        if (err) {
-	                INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID
-				    console.log("Downloading", INFILE);
-				    getHttp(INFILE, function(err, res){
-				        if (err) {
-			    	        console.error(err);
-				        } else {
-				        	parseFile(res);
-				        }
-				    });
-		        } else {
-		        	parseFile(res);
-		        }
-	    	});
-        } else {
-        	parseFile(res);
-        }
-    });
+  // get points
+  getPoints(OSMID, function(response){
+
+    points = parseFile(response)
+
+    //
+    // GET TILES for all zoom levels
+    //
+
+    tiles = [];
+    for (z in zoom) {
+        tiles.push(getTiles(points, zoom[z]));
+    }
+
+    if (listonly) {
+        // output coords
+        console.log(JSON.stringify(tiles));
+        console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
+    } else {
+        // load tiles
+        console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
+        exportVBOs(tiles);
+        // pull in functionality from manhattan-project
+    }
+
+
+  });
 }
 
-function parseFile(res) {	
-    parser = new DOMParser();
-    response = parser.parseFromString(res, "text/xml");
+function getPoints(OSMID, callback) {
+  // try to download the node's xml from OSM
+  // three possible element types: relation, way, and node
+  INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
+  console.log("Downloading relation:", INFILE);
+  getHttp(INFILE, function(err, res){
+    if (err) {
+      console.error('no relation:', err);
+      INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full';
+      console.log("Downloading way:", INFILE);
+      getHttp(INFILE, function(err, res){
+        if (err) {
+          console.error('no way:', err);
 
-    console.log('xml:', response)
+          INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID;
+          console.log("Downloading node:", INFILE);
+          getHttp(INFILE, function(err, res){
+            if (err) {
+                console.error('no node:', err);
+            } else {
+              console.log('node received')
+              callback(res);
+            }
+          });
+        } else {
+          console.log('way received')
+          callback(res);
+        }
+      });
+    } else {
+      console.log('relation received')
+      callback(res);
+    }
+  });
+}
 
-    xmlroot = response.documentElement;
-    // console.log('xmlroot:', xmlroot)
-    // console.log('xmlroot children:', xmlroot.children)
-    // console.log('xmlroot[0]:', xmlroot)
+function parseFile(res) { 
+  parser = new DOMParser();
+  response = parser.parseFromString(res, "text/xml");
 
-	//
-	// PROCESSING points
-	//
+  console.log('xml:', response)
 
-    console.log("Processing:")
-    // var response = JSON.parse(res);
+  xmlroot = response.documentElement;
 
-    points = [];
-	for (n in xmlroot.children) {
-		node = xmlroot.children[n];
-	    if (node.tagName == "node") {
-	        lat = parseFloat(node.getAttribute("lat"));
-	        lon = parseFloat(node.getAttribute("lon"));
-	        // console.log('lat:', lat, 'lon:', lon)
-	        points.push({'y':lat, 'x':lon});
-	    }
-	}
-	// console.log('points:', points);
+  //
+  // PROCESSING points
+  //
 
-	//
-	// GET TILES for all zoom levels
-	//
-	for (z in zoom) {
-	    getTiles(points,zoom[z]);
-	}
+  console.log("Processing:")
+  // var response = JSON.parse(res);
 
+  points = [];
+  for (n in xmlroot.children) {
+    node = xmlroot.children[n];
+    if (node.tagName == "node") {
+      lat = parseFloat(node.getAttribute("lat"));
+      lon = parseFloat(node.getAttribute("lon"));
+      // console.log('lat:', lat, 'lon:', lon)
+      points.push({'y':lat, 'x':lon});
+    }
+  }
+  // console.log('points:', points);
+
+  return points;
 }
 
 function dedupeArray(a) {
@@ -188,11 +214,12 @@ function dedupeArray(a) {
     return newarray;
 }
 var tileslist = []
+
 function getTiles(points,zoom) {
-    tiles = [];
-	var tilesset = new Set();
+  tiles = [];
+  var tilesset = new Set();
     for (p in points) {
-    	point = points[p];
+      point = points[p];
         tile = JSON.stringify(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom));
         tilesset.add(tile);
     }
@@ -287,17 +314,7 @@ function getTiles(points,zoom) {
     // add fill tiles to boundary tiles
     tiles.concat(newtiles);
 
-    if (coordsonly) {
-        // output coords
-        console.log(JSON.stringify(tiles));
-        console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
-    } else {
-        // load tiles
-        console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
-        exportVBOs(tiles);
-        // pull in functionality from manhattan-project
-    }
-
+    return tiles;
 }
 
 
@@ -458,7 +475,6 @@ function exportVBOs(tiles) {
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
     function processVerts(coords, offset, name) {
-      console.log('processverts!')
       console.log("Processing tile", vbosProcessed + 1, "of", mytiles.length, "-", (((vbosProcessed + 1)/mytiles.length)*100).toFixed(2), "%");
 
       meshes = scene.tile_manager.tiles[coords].meshes;
@@ -557,9 +573,5 @@ function exportVBOs(tiles) {
 
 }
 
-// landgrab(209879879874648, "0-3, 1, 12", 1)
-// landgrab(204648, "0-3, 1, 12", 1)
-// landgrab(3954665, 16, 1)
-// landgrab(3954665, 15)
 
 
