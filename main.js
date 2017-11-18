@@ -61,7 +61,8 @@
         // landgrab(3954665, 16, "list")
         // landgrab(3954665, 15)
         // landgrab(3954665, 16, "list")
-        landgrab(3954665, 14, 'vbo')
+        // landgrab(3954665, 14, 'vbo')
+        landgrab(3954665, 10, 'vector')
     });
 
 

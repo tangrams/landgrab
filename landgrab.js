@@ -17,7 +17,7 @@ function dedupe(b) {
     return a;
 }
 
-function getHttp (url, callback) {
+function getHttp(url, callback) {
     var request = new XMLHttpRequest();
     var method = 'GET';
 
@@ -84,6 +84,7 @@ function metersForTile(tile) {
 // landgrab(3954665, 16, "vector")
 // landgrab(3954665, 14) // default type is "list"
 function landgrab(OSMID, zoomarg, format = "list") {
+    window.oldTitle = document.title;
 
     if (zoomarg != scene.zoom) {
         map.setZoom(zoomarg);
@@ -328,18 +329,51 @@ function findTileRange(tiles) {
     return [min, max];
 }
 
+// grab vector tiles from Mapzen datasource
+function grabVectorTiles(tiles) {
+
+    // console.log('grab vector:', tiles)
+    var api_key = 'vector-tiles-_vxMzew';
+    var receivedTiles = [];
+    for (tile of tiles) {
+        // console.log(tile)
+    // http://tile.mapzen.com/mapzen/vector/v1/{layers}/{z}/{x}/{y}.{format}?api_key={api_key}
+        var source = 'http://tile.mapzen.com/mapzen/vector/v1/all/';
+        var address = tile.z+'/'+tile.x+'/'+tile.y;
+        var filetype = ".json"
+        var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
+        var auth = '?api_key='+api_key;
+        var url = source+address+filetype+auth;
+        // console.log(url)
+        getHttp(url, function(err, res){
+            if (err) {
+                console.error(err)
+            } else {
+                receivedTiles.push({name: this.name, file: res});
+                // console.log('response received:', res);
+                if (receivedTiles.length === tiles.length) {
+                    zipFiles(receivedTiles, "json");
+                }
+            }
+        }.bind({name:name}));
+    }
+}
+
+// grab terrain tiles from Mapzen
+function grabTerrainTiles(tiles) {
+    console.log('grab terrain')
+}
+
 // export VBOs from Tangram
 function grabVBOs(tiles) {
 
     console.log("Beginning VBO export");
 
-    var mytiles = tiles;
-
-    var num = mytiles.length;
+    var num = tiles.length;
     // console.log("Loading", num, "tiles");
 
     // find tile range, for offset calculation
-    var [min, max] = findTileRange(mytiles);
+    var [min, max] = findTileRange(tiles);
 
     // prepare a list of vbos
     vbos = [];
@@ -424,7 +458,7 @@ function grabVBOs(tiles) {
         console.log('waiting for vbos')
       setTimeout(function () {
         // console.log('vbosProcessed:', vbosProcessed)
-        if (vbosProcessed == mytiles.length) {
+        if (vbosProcessed == tiles.length) {
             callback();
             return;
         }
@@ -434,13 +468,13 @@ function grabVBOs(tiles) {
     }
 
     function loadTiles() {
-      for (t in mytiles) {
-        document.title = t+" of "+mytiles.length+" loaded - "+(((parseInt(t) + 1)/mytiles.length)*100).toFixed(2)+ "%";
+      for (t in tiles) {
+        document.title = t+" of "+tiles.length+" loaded - "+(((parseInt(t) + 1)/tiles.length)*100).toFixed(2)+ "%";
 
         // todo: determine whether this is working
-        scene.tile_manager.loadCoordinate(mytiles[t]);
+        scene.tile_manager.loadCoordinate(tiles[t]);
       }
-      console.log("%d tiles loaded", mytiles.length);
+      console.log("%d tiles loaded", tiles.length);
     }
 
     function tile_to_meters(zoom) {
@@ -449,8 +483,8 @@ function grabVBOs(tiles) {
 
     function processTiles() {
       var zoom;
-      for (t in mytiles) {
-        mt = mytiles[t];
+      for (t in tiles) {
+        mt = tiles[t];
         if (Object.keys(scene.config.sources).length > 1) {
           console.error("This scene has data from multiple sources:", Object.keys(scene.config.sources), "Only scenes with a single source are supported for export.");
           return false;
@@ -478,7 +512,7 @@ function grabVBOs(tiles) {
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
     function processVerts(coords, offset, name) {
-      document.title = (vbosProcessed + 1)+" of "+mytiles.length+" processed - "+(((vbosProcessed + 1)/mytiles.length)*100).toFixed(2)+ "%";
+      document.title = (vbosProcessed + 1)+" of "+tiles.length+" processed - "+(((vbosProcessed + 1)/tiles.length)*100).toFixed(2)+ "%";
 
       meshes = scene.tile_manager.tiles[coords].meshes;
       allverts = "";
@@ -526,7 +560,7 @@ function grabVBOs(tiles) {
     }
 
     // zip with zip.js
-    function zipBlobs() {
+    function zipVBOBlobs() {
       filenames = [];
       zip.workerScriptsPath = "/lib/";
 
@@ -568,12 +602,59 @@ function grabVBOs(tiles) {
         nextFile(f);
       }, onerror);
     }
-    window.oldTitle = document.title;
+
     waitForWorkers(loadTiles);
 
     waitForScene(processTiles);
 
-    waitForVBOs(zipBlobs);
+    waitForVBOs(zipVBOBlobs);
 
 }
 
+// zip with zip.js
+// expects array of files and a type string, eg "vbo" or "png"
+function zipFiles(files, type) {
+    console.log('files:', files)
+    filenames = [];
+    zip.workerScriptsPath = "/lib/";
+
+    if (files.length == 0) { console.log("No files to zip!\nDone!"); return; }
+
+    console.log('zipping %d files...', files.length);
+
+    zip.createWriter(new zip.BlobWriter("application/zip"), function(writer) {
+        console.log("Creating zip...");
+        var f = 0;
+        function nextFile(f) {
+            // check for existing filename
+            filename = files[f].name;
+            console.log(files[f])
+            if (filenames.indexOf(filename) == -1) { // if file doesn't already exist:
+                filenames.push(filename);
+                writer.add(filename, new zip.TextReader(files[f].file), function() {
+                    // callback
+                    f++;
+                    if (f < files.length) {
+                        nextFile(f);
+                    } else close();
+                });
+            } else {
+                console.log(filename, "is a duplicate, skipping");
+                f++;
+                if (f < files.length) {
+                    nextFile(f);
+                } else close();
+            }
+        }
+        function close() {
+                // close the writer
+            writer.close(function(blob) {
+                // save with FileSaver.js
+                saveAs(blob, "example.zip");
+                console.log("Done!");
+                document.title = oldTitle;
+            });
+        }
+        nextFile(f);
+    }, onerror);
+}
