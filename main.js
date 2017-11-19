@@ -53,9 +53,42 @@
     window.addEventListener('resize', resizeMap);
     resizeMap();
 
+    // Create dat GUI
+    var gui;
+    function addGUI () {
+        gui.domElement.parentNode.style.zIndex = 400; // make sure GUI is on top of map
+        window.gui = gui;
+
+        gui.OSM_ID = '3954665';
+        gui.add(gui, 'OSM_ID').name("OSM ID");
+
+        gui.API_KEY = 'mapzen-XXXXXX';
+        gui.add(gui, 'API_KEY').name("API KEY");
+
+        gui.ZOOM = '12';
+        gui.add(gui, 'ZOOM');
+
+        gui.format = 'list';
+        gui.add(gui, 'format', ['list', 'vbo', 'vector', 'terrain']);
+
+        gui.GRABLAND = function() {
+            console.log('grabbin');
+            landgrab(gui.OSM_ID, gui.ZOOM, gui.format)
+        };
+        gui.add(gui, 'GRABLAND');
+
+
+
+    }
+
+
     window.addEventListener('load', function () {
         // Scene initialized
         layer.addTo(map);
+
+        gui = new dat.GUI({ autoPlace: true, hideable: true, width: 300 });
+        addGUI();
+
         // landgrab(209879879874648, "0-3, 1, 12", "list")
         // landgrab(204648, "0-3, 1, 12", "list")
         // landgrab(3954665, 16, "list")
@@ -63,7 +96,7 @@
         // landgrab(3954665, 16, "list")
         // landgrab(3954665, 10, 'vbo')
         // landgrab(3954665, 10, 'vector')
-        landgrab(3954665, 10, 'terrain')
+        // landgrab(3954665, 10, 'terrain')
     });
 
 
