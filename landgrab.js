@@ -17,23 +17,27 @@ function dedupe(b) {
     return a;
 }
 
-function getHttp(url, callback) {
-    var request = new XMLHttpRequest();
+function getHttp(url, type, callback) {
+    var xhr = new XMLHttpRequest();
     var method = 'GET';
-
-    request.onreadystatechange = function () {
-        if (request.readyState === 4 && request.status === 200) {
-            var response = request.responseText;
-
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            if (type === "text" || type === "json") {
+                var response = xhr.responseText;
+            } else {
+                response = xhr.response;
+                console.log('response?', response)
+            }
             var error = null;
             callback(error, response);
-        } else if (request.readyState === 4 && request.status === 404) {
+        } else if (xhr.readyState === 4 && xhr.status === 404) {
             var error = 'nope';
             callback(error, response);
         }
     };
-    request.open(method, url, true);
-    request.send();
+    xhr.open(method, url, true);
+    if (type !== "text" && type !== "json") xhr.responseType = "arraybuffer";
+    xhr.send();
 }
 
 // Convert lat-lng to mercator meters
@@ -147,18 +151,18 @@ function getPoints(OSMID, callback) {
     // three possible element types: relation, way, and node
     INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
     console.log("Downloading relation:", INFILE);
-    getHttp(INFILE, function(err, res){
+    getHttp(INFILE, 'text', function(err, res){
     if (err) {
         console.error('no relation:', err);
         INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full';
         console.log("Downloading way:", INFILE);
-        getHttp(INFILE, function(err, res){
+        getHttp(INFILE, 'text', function(err, res){
         if (err) {
             console.error('no way:', err);
 
             INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID;
             console.log("Downloading node:", INFILE);
-            getHttp(INFILE, function(err, res){
+            getHttp(INFILE, 'text', function(err, res){
             if (err) {
                 console.error('no node:', err);
             } else {
@@ -345,7 +349,7 @@ function grabVectorTiles(tiles) {
         var auth = '?api_key='+api_key;
         var url = source+address+filetype+auth;
         // console.log(url)
-        getHttp(url, function(err, res){
+        getHttp(url, 'json', function(err, res){
             if (err) {
                 console.error(err)
             } else {
@@ -362,7 +366,33 @@ function grabVectorTiles(tiles) {
 // grab terrain tiles from Mapzen
 function grabTerrainTiles(tiles) {
     console.log('grab terrain')
-}
+    // console.log('grab vector:', tiles)
+    var api_key = 'vector-tiles-_vxMzew';
+    var receivedTiles = [];
+    for (tile of tiles) {
+        // console.log(tile)
+    // https://tile.mapzen.com/mapzen/terrain/v1/terrarium/{z}/{x}/{y}.{format}?api_key={api_key}
+        var source = 'http://tile.mapzen.com/mapzen/terrain/v1/terrarium/';
+        var address = tile.z+'/'+tile.x+'/'+tile.y;
+        var filetype = ".png"
+        var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
+        var auth = '?api_key='+api_key;
+        var url = source+address+filetype+auth;
+        console.log('url:', url)
+        getHttp(url, 'png', function(err, res){
+            console.log('?')
+            if (err) {
+                console.error(err)
+            } else {
+                receivedTiles.push({name: this.name, file: res});
+                // console.log('response received:', res);
+                if (receivedTiles.length === tiles.length) {
+                    // saveAs(new Blob([res], {type:"image/png"}),name);
+                    zipFiles(receivedTiles, "png");
+                }
+            }
+        }.bind({name:name}));
+    }}
 
 // export VBOs from Tangram
 function grabVBOs(tiles) {
@@ -631,13 +661,27 @@ function zipFiles(files, type) {
             console.log(files[f])
             if (filenames.indexOf(filename) == -1) { // if file doesn't already exist:
                 filenames.push(filename);
-                writer.add(filename, new zip.TextReader(files[f].file), function() {
-                    // callback
-                    f++;
-                    if (f < files.length) {
-                        nextFile(f);
-                    } else close();
-                });
+
+                if (type === "json") {
+                    writer.add(filename, new zip.TextReader(files[f].file), function() {
+                        // callback
+                        f++;
+                        if (f < files.length) {
+                            nextFile(f);
+                        } else close();
+                    });
+                } else if (type === "png") {
+
+                    fblob = new Blob([files[f].file], { type: "image/png" });
+                    writer.add(filename, new zip.BlobReader(fblob), function() {
+                        // callback
+                        f++;
+                        if (f < files.length) {
+                            nextFile(f);
+                        } else close();
+                    });
+                }
+
             } else {
                 console.log(filename, "is a duplicate, skipping");
                 f++;
