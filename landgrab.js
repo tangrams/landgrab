@@ -1,6 +1,5 @@
 var tile_size = 256;
-var half_circumference_meters = 20037508.342789244;
-var xmlroot;
+const half_circumference_meters = 20037508.342789244;
 
 function range(start, end) {
     // console.log('range ', start, end)
@@ -11,30 +10,34 @@ function range(start, end) {
 }
 
 function dedupe(b) {
-	a = [];
-	b.forEach(function(value){
-	  if (a.indexOf(value)==-1) a.push(value);
-	});
-	return a;
+    a = [];
+    b.forEach(function(value){
+        if (a.indexOf(value)==-1) a.push(value);
+    });
+    return a;
 }
 
-function getHttp (url, callback) {
-    var request = new XMLHttpRequest();
+function getHttp(url, type, callback) {
+    var xhr = new XMLHttpRequest();
     var method = 'GET';
-
-    request.onreadystatechange = function () {
-        if (request.readyState === 4 && request.status === 200) {
-            var response = request.responseText;
-
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            if (type === "text" || type === "json") {
+                var response = xhr.responseText;
+            } else {
+                response = xhr.response;
+                console.log('response?', response)
+            }
             var error = null;
             callback(error, response);
-        } else if (request.readyState === 4 && request.status === 404) {
+        } else if (xhr.readyState === 4 && xhr.status === 404) {
             var error = 'nope';
             callback(error, response);
         }
     };
-    request.open(method, url, true);
-    request.send();
+    xhr.open(method, url, true);
+    if (type !== "text" && type !== "json") xhr.responseType = "arraybuffer";
+    xhr.send();
 }
 
 // Convert lat-lng to mercator meters
@@ -77,23 +80,30 @@ function metersForTile(tile) {
     }
 }
 
-coordsonly = false;
+// grab land
+// expects an OpenStreetMap ID integer, a zoom argument string, and a format string
+// examples:
+// landgrab(209879879874648, "0-3, 1, 12", "list")
+// landgrab(204648, "0-3, 1, 12", "terrain")
+// landgrab(3954665, 16, "vector")
+// landgrab(3954665, 14) // default type is "list"
+function landgrab(OSMID, zoomarg, format = "list") {
+    window.oldTitle = document.title;
 
-function landgrab(OSMID, zoomarg, listonly) {
+    if (zoomarg != scene.zoom) {
+        map.setZoom(zoomarg);
+    }
 
-  if (zoomarg != scene.zoom) {
-    map.setZoom(zoomarg);
-  }
+    console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'format:', format);
+    if (arguments.length < 2) {
+        console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
+        return false;
+    }
 
-	console.log('OSMID:', OSMID, 'zoomarg:', zoomarg, 'listonly:', listonly);
-	if (arguments.length < 2) {
-	    console.log("At least 2 arguments needed - please enter an OSM ID and zoom level.")
-	    return false;
-	}
-
-    if (listonly) coordsonly = true;
     zoom = [];
     console.log('String(zoomarg).split(","):', String(zoomarg).split(','))
+    // parse zoom argument – accepts a comma-separated list and ranges in the form start-stop
+    // eg: "1,3,5-8"
     zoomarg = String(zoomarg).replace(/\s+/g, '');
     String(zoomarg).split(',').forEach(function(part) {
         if (part.indexOf('-') > -1) {
@@ -105,75 +115,94 @@ function landgrab(OSMID, zoomarg, listonly) {
             a = parseInt(part);
             zoom.push(a);
         }
-	});
-	zoom = dedupe(zoom);
+    });
+    zoom = dedupe(zoom);
 
-	// try to download the node's xml from OSM
-	// this is ugly
-    INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
-    console.log("Downloading", INFILE);
-    getHttp(INFILE, function(err, res){
-        if (err) {
-	        INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full'
-		    console.log("Downloading", INFILE);
-		    getHttp(INFILE, function(err, res){
-		        if (err) {
-	                INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID
-				    console.log("Downloading", INFILE);
-				    getHttp(INFILE, function(err, res){
-				        if (err) {
-			    	        console.error(err);
-				        } else {
-				        	parseFile(res);
-				        }
-				    });
-		        } else {
-		        	parseFile(res);
-		        }
-	    	});
-        } else {
-        	parseFile(res);
+    // get points
+    getPoints(OSMID, function(response){
+        points = parseFile(response)
+
+
+        // GET TILES for all zoom levels
+        tiles = [];
+        for (z in zoom) {
+            tiles.push(getTiles(points, zoom[z]));
+        }
+
+        if (format === "list") {
+            // output coords
+            console.log(JSON.stringify(tiles));
+            console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
+        } else if (format === "vbo") {
+            // load tiles
+            console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
+            grabVBOs(tiles);
+            // pull in functionality from manhattan-project
+        } else if (format === "vector") {
+            grabVectorTiles(tiles);
+        } else if (format === "terrain") {
+            grabTerrainTiles(tiles);
         }
     });
 }
 
-function parseFile(res) {	
+function getPoints(OSMID, callback) {
+    // try to download the node's xml from OSM
+    // three possible element types: relation, way, and node
+    INFILE = 'http://www.openstreetmap.org/api/0.6/relation/'+OSMID+'/full';
+    console.log("Downloading relation:", INFILE);
+    getHttp(INFILE, 'text', function(err, res){
+    if (err) {
+        console.error('no relation:', err);
+        INFILE = 'http://www.openstreetmap.org/api/0.6/way/'+OSMID+'/full';
+        console.log("Downloading way:", INFILE);
+        getHttp(INFILE, 'text', function(err, res){
+        if (err) {
+            console.error('no way:', err);
+
+            INFILE = 'http://www.openstreetmap.org/api/0.6/node/'+OSMID;
+            console.log("Downloading node:", INFILE);
+            getHttp(INFILE, 'text', function(err, res){
+            if (err) {
+                console.error('no node:', err);
+            } else {
+                console.log('node received')
+                callback(res);
+            }
+            });
+        } else {
+            console.log('way received')
+            callback(res);
+        }
+        });
+    } else {
+        console.log('relation received')
+        callback(res);
+    }
+    });
+}
+
+// parse an XML response from the OSM API and extract latlon points
+// which make up the outline of the object
+function parseFile(res) {
     parser = new DOMParser();
     response = parser.parseFromString(res, "text/xml");
+    // console.log('xml:', response)
 
-    console.log('xml:', response)
+    var xmlroot = response.documentElement;
 
-    xmlroot = response.documentElement;
-    // console.log('xmlroot:', xmlroot)
-    // console.log('xmlroot children:', xmlroot.children)
-    // console.log('xmlroot[0]:', xmlroot)
-
-	//
-	// PROCESSING points
-	//
-
-    console.log("Processing:")
-    // var response = JSON.parse(res);
-
+    // extract points from XML response
     points = [];
-	for (n in xmlroot.children) {
-		node = xmlroot.children[n];
-	    if (node.tagName == "node") {
-	        lat = parseFloat(node.getAttribute("lat"));
-	        lon = parseFloat(node.getAttribute("lon"));
-	        // console.log('lat:', lat, 'lon:', lon)
-	        points.push({'y':lat, 'x':lon});
-	    }
-	}
-	// console.log('points:', points);
+    for (n in xmlroot.children) {
+        node = xmlroot.children[n];
+        if (node.tagName == "node") {
+            lat = parseFloat(node.getAttribute("lat"));
+            lon = parseFloat(node.getAttribute("lon"));
+            points.push({'y':lat, 'x':lon});
+        }
+    }
 
-	//
-	// GET TILES for all zoom levels
-	//
-	for (z in zoom) {
-	    getTiles(points,zoom[z]);
-	}
-
+    return points;
 }
 
 function dedupeArray(a) {
@@ -187,12 +216,12 @@ function dedupeArray(a) {
     });
     return newarray;
 }
-var tileslist = []
+
 function getTiles(points,zoom) {
     tiles = [];
-	var tilesset = new Set();
+    var tilesset = new Set();
     for (p in points) {
-    	point = points[p];
+      point = points[p];
         tile = JSON.stringify(tileForMeters(latLngToMeters({'x':point['x'],'y':point['y']}), zoom));
         tilesset.add(tile);
     }
@@ -200,7 +229,7 @@ function getTiles(points,zoom) {
     tilesset.forEach(function (t) {
         tiles.push(JSON.parse(t));
     });
-    console.log('number of tiles:', tiles.length);
+    // console.log('number of tiles:', tiles.length);
 
     // patch holes in tileset
 
@@ -287,41 +316,94 @@ function getTiles(points,zoom) {
     // add fill tiles to boundary tiles
     tiles.concat(newtiles);
 
-    if (coordsonly) {
-        // output coords
-        console.log(JSON.stringify(tiles));
-        console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
-    } else {
-        // load tiles
-        console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
-        exportVBOs(tiles);
-        // pull in functionality from manhattan-project
-    }
-
+    return tiles;
 }
 
-
-
-function exportVBOs(tiles) {
-
-    console.log("Beginning VBO export");
-
-    var mytiles = tiles;
-
-    var num = mytiles.length;
-    console.log("Loading", num, "tiles");
-
-    // find tile range, for offset calculation
-    min = {x: Infinity, y: Infinity};
-    max = {x:-Infinity, y: -Infinity};
-    for (t in mytiles) {
-      mt = mytiles[t];
+function findTileRange(tiles) {
+    var min = {x: Infinity, y: Infinity};
+    var max = {x:-Infinity, y: -Infinity};
+    for (t in tiles) {
+      mt = tiles[t];
 
       min.x = Math.min(min.x, mt.x);
       min.y = Math.min(min.y, mt.y);
       max.x = Math.max(max.x, mt.x);
       max.y = Math.max(max.y, mt.y);
     }
+    return [min, max];
+}
+
+// grab vector tiles from Mapzen datasource
+function grabVectorTiles(tiles) {
+
+    // console.log('grab vector:', tiles)
+    var api_key = 'vector-tiles-_vxMzew';
+    var receivedTiles = [];
+    for (tile of tiles) {
+        // console.log(tile)
+    // http://tile.mapzen.com/mapzen/vector/v1/{layers}/{z}/{x}/{y}.{format}?api_key={api_key}
+        var source = 'http://tile.mapzen.com/mapzen/vector/v1/all/';
+        var address = tile.z+'/'+tile.x+'/'+tile.y;
+        var filetype = ".json"
+        var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
+        var auth = '?api_key='+api_key;
+        var url = source+address+filetype+auth;
+        // console.log(url)
+        getHttp(url, 'json', function(err, res){
+            if (err) {
+                console.error(err)
+            } else {
+                receivedTiles.push({name: this.name, file: res});
+                // console.log('response received:', res);
+                if (receivedTiles.length === tiles.length) {
+                    zipFiles(receivedTiles, "json");
+                }
+            }
+        }.bind({name:name}));
+    }
+}
+
+// grab terrain tiles from Mapzen
+function grabTerrainTiles(tiles) {
+    console.log('grab terrain')
+    // console.log('grab vector:', tiles)
+    var api_key = 'vector-tiles-_vxMzew';
+    var receivedTiles = [];
+    for (tile of tiles) {
+        // console.log(tile)
+    // https://tile.mapzen.com/mapzen/terrain/v1/terrarium/{z}/{x}/{y}.{format}?api_key={api_key}
+        var source = 'http://tile.mapzen.com/mapzen/terrain/v1/terrarium/';
+        var address = tile.z+'/'+tile.x+'/'+tile.y;
+        var filetype = ".png"
+        var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
+        var auth = '?api_key='+api_key;
+        var url = source+address+filetype+auth;
+        console.log('url:', url)
+        getHttp(url, 'png', function(err, res){
+            console.log('?')
+            if (err) {
+                console.error(err)
+            } else {
+                receivedTiles.push({name: this.name, file: res});
+                // console.log('response received:', res);
+                if (receivedTiles.length === tiles.length) {
+                    // saveAs(new Blob([res], {type:"image/png"}),name);
+                    zipFiles(receivedTiles, "png");
+                }
+            }
+        }.bind({name:name}));
+    }}
+
+// export VBOs from Tangram
+function grabVBOs(tiles) {
+
+    console.log("Beginning VBO export");
+
+    var num = tiles.length;
+    // console.log("Loading", num, "tiles");
+
+    // find tile range, for offset calculation
+    var [min, max] = findTileRange(tiles);
 
     // prepare a list of vbos
     vbos = [];
@@ -331,6 +413,7 @@ function exportVBOs(tiles) {
         // console.log('waiting for verts. callback:', callback)
       var coords = coords;
       var name = name;
+      // have to use a timeout because there's no callback in Tangram for this
       setTimeout(function () {
         // console.log('coords:', coords)
         // console.log('typeof scene.tile_manager.tiles[coords]:',typeof scene.tile_manager.tiles[coords]);
@@ -405,7 +488,7 @@ function exportVBOs(tiles) {
         console.log('waiting for vbos')
       setTimeout(function () {
         // console.log('vbosProcessed:', vbosProcessed)
-        if (vbosProcessed == mytiles.length) {
+        if (vbosProcessed == tiles.length) {
             callback();
             return;
         }
@@ -415,12 +498,13 @@ function exportVBOs(tiles) {
     }
 
     function loadTiles() {
-      for (t in mytiles) {
-        console.log("loading", mytiles[t]);
+      for (t in tiles) {
+        document.title = t+" of "+tiles.length+" loaded - "+(((parseInt(t) + 1)/tiles.length)*100).toFixed(2)+ "%";
+
         // todo: determine whether this is working
-        scene.tile_manager.loadCoordinate(mytiles[t]);
+        scene.tile_manager.loadCoordinate(tiles[t]);
       }
-      console.log("%d tiles loaded", mytiles.length);
+      console.log("%d tiles loaded", tiles.length);
     }
 
     function tile_to_meters(zoom) {
@@ -429,8 +513,8 @@ function exportVBOs(tiles) {
 
     function processTiles() {
       var zoom;
-      for (t in mytiles) {
-        mt = mytiles[t];
+      for (t in tiles) {
+        mt = tiles[t];
         if (Object.keys(scene.config.sources).length > 1) {
           console.error("This scene has data from multiple sources:", Object.keys(scene.config.sources), "Only scenes with a single source are supported for export.");
           return false;
@@ -448,7 +532,7 @@ function exportVBOs(tiles) {
         offset.x *= 4096;
         offset.y *= 4096;
 
-        console.log('wait for verts!')
+        // console.log('wait for verts!')
         // wait for tile to load, then process it
         waitForVerts(processVerts, coords, offset, name);
       }
@@ -458,8 +542,7 @@ function exportVBOs(tiles) {
     conversion_factor = tile_to_meters(zoom) / maximum_range;
 
     function processVerts(coords, offset, name) {
-      console.log('processverts!')
-      console.log("Processing tile", vbosProcessed + 1, "of", mytiles.length, "-", (((vbosProcessed + 1)/mytiles.length)*100).toFixed(2), "%");
+      document.title = (vbosProcessed + 1)+" of "+tiles.length+" processed - "+(((vbosProcessed + 1)/tiles.length)*100).toFixed(2)+ "%";
 
       meshes = scene.tile_manager.tiles[coords].meshes;
       allverts = "";
@@ -507,7 +590,7 @@ function exportVBOs(tiles) {
     }
 
     // zip with zip.js
-    function zipBlobs() {
+    function zipVBOBlobs() {
       filenames = [];
       zip.workerScriptsPath = "/lib/";
 
@@ -543,7 +626,8 @@ function exportVBOs(tiles) {
             // save with FileSaver.js
             saveAs(blob, "example.zip");
             console.log("Done!");
-            });
+            document.title = oldTitle;
+          });
         }
         nextFile(f);
       }, onerror);
@@ -553,13 +637,68 @@ function exportVBOs(tiles) {
 
     waitForScene(processTiles);
 
-    waitForVBOs(zipBlobs);
+    waitForVBOs(zipVBOBlobs);
 
 }
 
-// landgrab(209879879874648, "0-3, 1, 12", 1)
-// landgrab(204648, "0-3, 1, 12", 1)
-// landgrab(3954665, 16, 1)
-// landgrab(3954665, 15)
+// zip with zip.js
+// expects array of files and a type string, eg "vbo" or "png"
+function zipFiles(files, type) {
+    console.log('files:', files)
+    filenames = [];
+    zip.workerScriptsPath = "/lib/";
 
+    if (files.length == 0) { console.log("No files to zip!\nDone!"); return; }
 
+    console.log('zipping %d files...', files.length);
+
+    zip.createWriter(new zip.BlobWriter("application/zip"), function(writer) {
+        console.log("Creating zip...");
+        var f = 0;
+        function nextFile(f) {
+            // check for existing filename
+            filename = files[f].name;
+            console.log(files[f])
+            if (filenames.indexOf(filename) == -1) { // if file doesn't already exist:
+                filenames.push(filename);
+
+                if (type === "json") {
+                    writer.add(filename, new zip.TextReader(files[f].file), function() {
+                        // callback
+                        f++;
+                        if (f < files.length) {
+                            nextFile(f);
+                        } else close();
+                    });
+                } else if (type === "png") {
+
+                    fblob = new Blob([files[f].file], { type: "image/png" });
+                    writer.add(filename, new zip.BlobReader(fblob), function() {
+                        // callback
+                        f++;
+                        if (f < files.length) {
+                            nextFile(f);
+                        } else close();
+                    });
+                }
+
+            } else {
+                console.log(filename, "is a duplicate, skipping");
+                f++;
+                if (f < files.length) {
+                    nextFile(f);
+                } else close();
+            }
+        }
+        function close() {
+                // close the writer
+            writer.close(function(blob) {
+                // save with FileSaver.js
+                saveAs(blob, "example.zip");
+                console.log("Done!");
+                document.title = oldTitle;
+            });
+        }
+        nextFile(f);
+    }, onerror);
+}
