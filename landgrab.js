@@ -26,7 +26,7 @@ function getHttp(url, type, callback) {
                 var response = xhr.responseText;
             } else {
                 response = xhr.response;
-                console.log('response?', response)
+                // console.log('response?', response)
             }
             var error = null;
             callback(error, response);
@@ -87,7 +87,7 @@ function metersForTile(tile) {
 // landgrab(204648, "0-3, 1, 12", "terrain")
 // landgrab(3954665, 16, "vector")
 // landgrab(3954665, 14) // default type is "list"
-function landgrab(OSMID, zoomarg, format = "list") {
+function landgrab(OSMID, zoomarg, format = "list", api_key) {
     window.oldTitle = document.title;
 
     if (zoomarg != scene.zoom) {
@@ -139,9 +139,9 @@ function landgrab(OSMID, zoomarg, format = "list") {
             grabVBOs(tiles);
             // pull in functionality from manhattan-project
         } else if (format === "vector") {
-            grabVectorTiles(tiles);
+            grabVectorTiles(tiles, api_key);
         } else if (format === "terrain") {
-            grabTerrainTiles(tiles);
+            grabTerrainTiles(tiles, api_key);
         }
     });
 }
@@ -334,10 +334,9 @@ function findTileRange(tiles) {
 }
 
 // grab vector tiles from Mapzen datasource
-function grabVectorTiles(tiles) {
+function grabVectorTiles(tiles, api_key) {
 
-    // console.log('grab vector:', tiles)
-    var api_key = 'vector-tiles-_vxMzew';
+    // console.log('grab vector:', tiles);
     var receivedTiles = [];
     for (tile of tiles) {
         // console.log(tile)
@@ -364,10 +363,9 @@ function grabVectorTiles(tiles) {
 }
 
 // grab terrain tiles from Mapzen
-function grabTerrainTiles(tiles) {
+function grabTerrainTiles(tiles, api_key) {
     console.log('grab terrain')
     // console.log('grab vector:', tiles)
-    var api_key = 'vector-tiles-_vxMzew';
     var receivedTiles = [];
     for (tile of tiles) {
         // console.log(tile)
@@ -380,7 +378,6 @@ function grabTerrainTiles(tiles) {
         var url = source+address+filetype+auth;
         console.log('url:', url)
         getHttp(url, 'png', function(err, res){
-            console.log('?')
             if (err) {
                 console.error(err)
             } else {
@@ -644,7 +641,7 @@ function grabVBOs(tiles) {
 // zip with zip.js
 // expects array of files and a type string, eg "vbo" or "png"
 function zipFiles(files, type) {
-    console.log('files:', files)
+    console.log('zipping files:', files)
     filenames = [];
     zip.workerScriptsPath = "/lib/";
 

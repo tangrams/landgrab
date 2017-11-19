@@ -85,24 +85,24 @@
         gui.OSM_ID = '3954665';
         gui.add(gui, 'OSM_ID').name("OSM ID");
 
-        gui.API_KEY = 'mapzen-XXXXXX';
+        gui.API_KEY = query.api_key || 'mapzen-XXXXXX';
+
         gui.add(gui, 'API_KEY').name("API KEY");
 
-        gui.ZOOM = '12';
+        gui.ZOOM = '10';
         gui.add(gui, 'ZOOM');
 
-        gui.format = 'list';
+        gui.format = 'terrain';
         gui.add(gui, 'format', ['list', 'vbo', 'vector', 'terrain']);
 
         gui.GRABLAND = function() {
             console.log('grabbin');
-            landgrab(gui.OSM_ID, gui.ZOOM, gui.format)
+            landgrab(gui.OSM_ID, gui.ZOOM, gui.format, gui.API_KEY)
         };
         gui.add(gui, 'GRABLAND');
 
-
-
     }
+
 
 
     window.addEventListener('load', function () {
