@@ -89,11 +89,12 @@
 
         gui.add(gui, 'API_KEY').name("API KEY");
 
-        gui.ZOOM = '10';
+        gui.ZOOM = '14';
         gui.add(gui, 'ZOOM');
 
-        gui.format = 'terrain';
-        gui.add(gui, 'format', ['list', 'vbo', 'vector', 'terrain']);
+        // gui.format = 'terrain-tif';
+        gui.format = 'list';
+        gui.add(gui, 'format', ['list', 'vbo', 'vector', 'terrain-png', 'terrain-tif']);
 
         gui.GRABLAND = function() {
             console.log('grabbin');
