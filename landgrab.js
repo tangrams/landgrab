@@ -129,19 +129,24 @@ function landgrab(OSMID, zoomarg, format = "list", api_key) {
             tiles.push(getTiles(points, zoom[z]));
         }
 
+
+
         if (format === "list") {
             // output coords
+            tiles = getBBoxTiles(tiles);
             console.log(JSON.stringify(tiles));
             console.log("Finished:", tiles.length, "tiles at zoom level", zoom);
         } else if (format === "vbo") {
             // load tiles
             console.log("Downloading", tiles.length, "tiles at zoom level", zoom);
-            grabVBOs(tiles);
+            grabVBOs(getBBoxTiles(tiles));
             // pull in functionality from manhattan-project
         } else if (format === "vector") {
             grabVectorTiles(tiles, api_key);
-        } else if (format === "terrain") {
-            grabTerrainTiles(tiles, api_key);
+        } else if (format === "terrain-png") {
+            grabTerrainTiles(getBBoxTiles(tiles), api_key);
+        } else if (format === "terrain-tif") {
+            grabTerrainTiffs(tiles, api_key);
         }
     });
 }
@@ -247,10 +252,48 @@ function getTiles(points,zoom) {
         miny = Math.min(miny, tile['y'])
         maxy = Math.max(maxy, tile['y'])
     }
-    // console.log(miny, minx, maxy, maxx);
+    console.log(miny, minx, maxy, maxx);
 
+    // not working
+    // newtiles = getOutlineTiles(tiles);
+    newtiles = getBBoxTiles(tiles);
+
+    // console.log('newtiles length:', newtiles.length);
+    // dedupe
+    newtiles = dedupeArray(newtiles);
+    // console.log('newtiles length:', newtiles.length);
+    
+    // add fill tiles to boundary tiles
+    tiles.concat(newtiles);
+
+    return newtiles;
+    return tiles;
+}
+
+// get all tiles in the bbox that contains the tileset
+function getBBoxTiles(tiles) {
+    console.log('tiles:', tiles)
+    var range = findTileRange(tiles);
+    console.log('range:', range)
+    min = range[0];
+    max = range[1];
+    var bboxtiles = [];
+    for (var x = min.x; x <= max.x; x++) {
+        for (var y = min.y; y <= max.y; y++) {
+            for (var z = min.z; z <= max.z; z++) {
+                bboxtiles.push({x:x, y:y, z:z})
+            }
+        }
+
+    }
+    return bboxtiles;
+    // console.log(bboxtiles)
+// debugger
+}
+
+// this tried to just download the tiles on the feature and then fill in - too complex
+function getOutlineTiles(tiles) {
     newtiles = [];
-
     for (t in tiles) {
         tile = tiles[t];
         // console.log('tile:', tile)
@@ -308,27 +351,21 @@ function getTiles(points,zoom) {
             }
         }
     }
-    // console.log('newtiles length:', newtiles.length);
-    // dedupe
-    newtiles = dedupeArray(newtiles);
-    // console.log('newtiles length:', newtiles.length);
-    
-    // add fill tiles to boundary tiles
-    tiles.concat(newtiles);
-
-    return tiles;
+    return newtiles
 }
 
 function findTileRange(tiles) {
-    var min = {x: Infinity, y: Infinity};
-    var max = {x:-Infinity, y: -Infinity};
+    var min = {x: Infinity, y: Infinity, z: Infinity};
+    var max = {x:-Infinity, y: -Infinity, z: -Infinity};
     for (t in tiles) {
       mt = tiles[t];
 
       min.x = Math.min(min.x, mt.x);
       min.y = Math.min(min.y, mt.y);
+      min.z = Math.min(min.z, mt.z);
       max.x = Math.max(max.x, mt.x);
       max.y = Math.max(max.y, mt.y);
+      max.z = Math.max(max.z, mt.z);
     }
     return [min, max];
 }
@@ -341,7 +378,7 @@ function grabVectorTiles(tiles, api_key) {
     for (tile of tiles) {
         // console.log(tile)
     // http://tile.mapzen.com/mapzen/vector/v1/{layers}/{z}/{x}/{y}.{format}?api_key={api_key}
-        var source = 'http://tile.mapzen.com/mapzen/vector/v1/all/';
+        var source = 'http://tile.mapzen.com/mapzen/vector/v1/water/';
         var address = tile.z+'/'+tile.x+'/'+tile.y;
         var filetype = ".json"
         var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
@@ -389,7 +426,38 @@ function grabTerrainTiles(tiles, api_key) {
                 }
             }
         }.bind({name:name}));
-    }}
+    }
+}
+
+// grab terrain geotiffs from Mapzen
+function grabTerrainTiffs(tiles, api_key) {
+    console.log('grab terrain tiffs')
+    // console.log('grab vector:', tiles)
+    var receivedTiles = [];
+    for (tile of tiles) {
+        // console.log(tile)
+    // https://tile.mapzen.com/mapzen/terrain/v1/terrarium/{z}/{x}/{y}.{format}?api_key={api_key}
+        var source = 'http://tile.mapzen.com/mapzen/terrain/v1/geotiff/';
+        var address = tile.z+'/'+tile.x+'/'+tile.y;
+        var filetype = ".tif"
+        var name = tile.z+'-'+tile.x+'-'+tile.y+filetype;
+        var auth = '?api_key='+api_key;
+        var url = source+address+filetype+auth;
+        console.log('url:', url)
+        getHttp(url, 'tif', function(err, res){
+            if (err) {
+                console.error(err)
+            } else {
+                receivedTiles.push({name: this.name, file: res});
+                // console.log('response received:', res);
+                if (receivedTiles.length === tiles.length) {
+                    // saveAs(new Blob([res], {type:"image/tif"}),name);
+                    zipFiles(receivedTiles, "tif");
+                }
+            }
+        }.bind({name:name}));
+    }
+}
 
 // export VBOs from Tangram
 function grabVBOs(tiles) {
@@ -667,9 +735,9 @@ function zipFiles(files, type) {
                             nextFile(f);
                         } else close();
                     });
-                } else if (type === "png") {
+                } else if (type === "png" || type === "tif") {
 
-                    fblob = new Blob([files[f].file], { type: "image/png" });
+                    fblob = new Blob([files[f].file], { type: "image/"+type });
                     writer.add(filename, new zip.BlobReader(fblob), function() {
                         // callback
                         f++;
