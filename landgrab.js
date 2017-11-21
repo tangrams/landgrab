@@ -122,14 +122,13 @@ function landgrab(OSMID, zoomarg, format = "list", api_key) {
     getPoints(OSMID, function(response){
         points = parseFile(response)
 
+        getBbox(points);
 
         // GET TILES for all zoom levels
         tiles = [];
         for (z in zoom) {
             tiles.push(getTiles(points, zoom[z]));
         }
-
-
 
         if (format === "list") {
             // output coords
@@ -149,6 +148,17 @@ function landgrab(OSMID, zoomarg, format = "list", api_key) {
             grabTerrainTiffs(tiles, api_key);
         }
     });
+}
+
+function getBbox(points) {
+    var minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+    for (var i = 0; i < points.length; i++) {
+        minx = Math.min(minx, points[i].x);
+        maxx = Math.max(maxx, points[i].x);
+        miny = Math.min(miny, points[i].y);
+        maxy = Math.max(maxy, points[i].y);
+    }
+    console.log('bbox:',miny, minx, maxy, maxx)
 }
 
 function getPoints(OSMID, callback) {
@@ -272,9 +282,9 @@ function getTiles(points,zoom) {
 
 // get all tiles in the bbox that contains the tileset
 function getBBoxTiles(tiles) {
-    console.log('tiles:', tiles)
+    // console.log('tiles:', tiles)
     var range = findTileRange(tiles);
-    console.log('range:', range)
+    console.log('tile range:', range)
     min = range[0];
     max = range[1];
     var bboxtiles = [];
