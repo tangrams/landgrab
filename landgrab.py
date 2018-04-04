@@ -218,10 +218,10 @@ def getTiles(_points,_zoom):
         sys.stdout.flush()
         for tile in tiles:
             tilename = "%i-%i-%i.json" % (_zoom,tile['x'],tile['y'])
-            r = requests.get("http://tile.mapzen.com/mapzen/vector/v1/all/%i/%i/%i.json?api_key=vector-tiles-HqUVidw" % (_zoom, tile['x'],tile['y']))
+            r = requests.get("https://tile.nextzen.org/tilezen/vector/v1/all/%i/%i/%i.json?api_key=tsINU1vsQnKLU1jjCimtVw" % (_zoom, tile['x'],tile['y']))
             j = json.loads(r.text)
 
-            # extract only buildings layer - mapzen vector tile files are collections of jeojson objects -
+            # extract only buildings layer - nextzen vector tile files are collections of geojson objects -
             # doing this turns each file into a valid standalone geojson files -
             # you can replace "buildings" with whichever layer you want
             # j = json.dumps(j["buildings"]) 
